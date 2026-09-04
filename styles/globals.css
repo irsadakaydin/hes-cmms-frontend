@@ -485,3 +485,61 @@ h1, h2, h3 {
   border-color: var(--teal);
   color: var(--teal);
 }
+
+/* ---------- Fotoğraf Yükleyici ---------- */
+
+.fotografListesi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.fotografKarti {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border: 1px solid var(--line-strong);
+}
+
+.fotografKarti img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fotografKarti button {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fotografEkleButon {
+  background: none;
+  border: 1px dashed var(--line-strong);
+  color: var(--teal);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.fotografEkleButon:hover:not(:disabled) {
+  border-color: var(--teal);
+  background: var(--amber-soft);
+}
+
+.fotografEkleButon:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
