@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { istekAt, tokenAl, yoneticiMi } from "../../lib/api";
+import { istekAt, tokenAl, yoneticiMi, dosyaIndir } from "../../lib/api";
 import UstBar from "../../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -27,6 +27,7 @@ export default function SantralDetaySayfasi() {
   const [ekipmanFormuAcik, setEkipmanFormuAcik] = useState(false);
   const [planFormuAcik, setPlanFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [raporIndiriliyor, setRaporIndiriliyor] = useState(false);
 
   const [yeniEkipman, setYeniEkipman] = useState({ ad: "", tip: "", seri_no: "", uretici: "" });
   const [yeniPlan, setYeniPlan] = useState({
@@ -114,6 +115,22 @@ export default function SantralDetaySayfasi() {
     }
   }
 
+  async function raporIndir(format) {
+    setHata(null);
+    setRaporIndiriliyor(true);
+    try {
+      const uzanti = format === "pdf" ? "pdf" : "xlsx";
+      await dosyaIndir(
+        `/api/v1/raporlar/santral/${id}/${format}`,
+        `bakim-raporu-${santral.ad.replace(/\s+/g, "-")}.${uzanti}`
+      );
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setRaporIndiriliyor(false);
+    }
+  }
+
   if (!santral) {
     return (
       <div className="sayfa">
@@ -141,6 +158,14 @@ export default function SantralDetaySayfasi() {
             <h2>{santral.ad}</h2>
             <div className="detayAlt">
               {santral.konum} {santral.turbin_tipi ? `— ${santral.turbin_tipi}` : ""}
+            </div>
+            <div className="raporButonlari">
+              <button className="kucukButon" onClick={() => raporIndir("pdf")} disabled={raporIndiriliyor}>
+                {raporIndiriliyor ? "Hazırlanıyor…" : "PDF Rapor İndir"}
+              </button>
+              <button className="kucukButon" onClick={() => raporIndir("excel")} disabled={raporIndiriliyor}>
+                {raporIndiriliyor ? "Hazırlanıyor…" : "Excel Rapor İndir"}
+              </button>
             </div>
           </div>
 
