@@ -1,76 +1,55 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { girisYap, tokenAl } from "../lib/api";
+import Link from "next/link";
+import { istekAt, tokenAl, yoneticiMi } from "../../lib/api";
+import UstBar from "../../components/UstBar";
 
-export default function GirisSayfasi() {
+export default function SantrallerSayfasi() {
   const router = useRouter();
-  const [eposta, setEposta] = useState("");
-  const [sifre, setSifre] = useState("");
-  const [yukleniyor, setYukleniyor] = useState(false);
+  const [santraller, setSantraller] = useState(null);
   const [hata, setHata] = useState(null);
 
   useEffect(() => {
-    if (tokenAl()) {
+    if (!tokenAl()) {
+      router.replace("/");
+      return;
+    }
+    if (!yoneticiMi()) {
       router.replace("/gorevler");
+      return;
     }
+    istekAt("/api/v1/santraller")
+      .then((veri) => setSantraller(veri.veri))
+      .catch((err) => setHata(err.message));
   }, [router]);
-
-  async function gonder(e) {
-    e.preventDefault();
-    setHata(null);
-    setYukleniyor(true);
-    try {
-      await girisYap(eposta, sifre);
-      router.push("/gorevler");
-    } catch (err) {
-      setHata(err.message || "Giriş yapılamadı.");
-    } finally {
-      setYukleniyor(false);
-    }
-  }
 
   return (
     <>
       <Head>
-        <title>Giriş — HES Bakım Yönetim Sistemi</title>
+        <title>Santraller — HES CMMS</title>
       </Head>
-      <div className="girisSayfasi">
-        <div className="girisKutu">
-          <div className="girisUst">
-            <span className="etiket">HES CMMS</span>
-            <h1>Bakım Yönetim Sistemine Giriş</h1>
+      <div className="sayfa">
+        <UstBar />
+        <div className="icerik">
+          <div className="bolumBaslik">
+            <h2>Santraller</h2>
+            {santraller && <span className="sayac">{santraller.length} santral</span>}
           </div>
 
           {hata && <div className="hataKutusu">{hata}</div>}
+          {!santraller && !hata && <div className="yukleniyor">Yükleniyor…</div>}
 
-          <form onSubmit={gonder}>
-            <div className="alan">
-              <label htmlFor="eposta">E-posta</label>
-              <input
-                id="eposta"
-                type="email"
-                autoComplete="username"
-                value={eposta}
-                onChange={(e) => setEposta(e.target.value)}
-                required
-              />
-            </div>
-            <div className="alan">
-              <label htmlFor="sifre">Şifre</label>
-              <input
-                id="sifre"
-                type="password"
-                autoComplete="current-password"
-                value={sifre}
-                onChange={(e) => setSifre(e.target.value)}
-                required
-              />
-            </div>
-            <button className="birincilButon" type="submit" disabled={yukleniyor}>
-              {yukleniyor ? "Giriş yapılıyor…" : "Giriş Yap"}
-            </button>
-          </form>
+          {santraller &&
+            santraller.map((s) => (
+              <Link key={s.santral_id} href={`/santraller/${s.santral_id}`} className="santralKart">
+                <div className="gorevSantral">{s.ad}</div>
+                <div className="gorevAlt">
+                  {s.konum} {s.turbin_tipi ? `— ${s.turbin_tipi}` : ""}{" "}
+                  {s.kurulu_guc_mw ? `— ${s.kurulu_guc_mw} MW` : ""}
+                </div>
+              </Link>
+            ))}
         </div>
       </div>
     </>
