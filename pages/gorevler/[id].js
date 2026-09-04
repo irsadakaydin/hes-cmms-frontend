@@ -4,6 +4,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { istekAt, tokenAl } from "../../lib/api";
 import UstBar from "../../components/UstBar";
+import ImzaPad from "../../components/ImzaPad";
 
 export default function GorevDetaySayfasi() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function GorevDetaySayfasi() {
   const [hata, setHata] = useState(null);
   const [cevaplar, setCevaplar] = useState({});
   const [notlar, setNotlar] = useState("");
-  const [imza, setImza] = useState("");
+  const [imza, setImza] = useState(null);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [basarili, setBasarili] = useState(false);
 
@@ -47,8 +48,8 @@ export default function GorevDetaySayfasi() {
     e.preventDefault();
     setHata(null);
 
-    if (!imza.trim()) {
-      setHata("Onaylamak için ad soyadınızı imza alanına yazmanız gerekiyor.");
+    if (!imza) {
+      setHata("Onaylamak için imza alanına imzanızı çizmeniz gerekiyor.");
       return;
     }
 
@@ -69,10 +70,7 @@ export default function GorevDetaySayfasi() {
           checklist_sonuclari: cevaplar,
           notlar: notlar || null,
           fotograf_urlleri: [],
-          // NOT: Bu MVP'de gerçek bir imza/çizim bileşeni yok — yazılan ad-soyad
-          // metni onay olarak kaydediliyor. İleride buraya gerçek bir imza
-          // yakalama (canvas) veya dosya yükleme bileşeni eklenebilir.
-          imza_url: `yazili-onay:${imza.trim()}`,
+          imza_url: imza,
         }),
       });
       setBasarili(true);
@@ -197,20 +195,8 @@ export default function GorevDetaySayfasi() {
               </div>
 
               <div className="kalem">
-                <div className="kalemSoru">Onay — ad soyadınızı yazın</div>
-                <input
-                  type="text"
-                  style={{
-                    width: "100%",
-                    padding: "9px 12px",
-                    border: "1px solid var(--line-strong)",
-                    fontFamily: "var(--font-body)",
-                    fontSize: "14px",
-                  }}
-                  value={imza}
-                  onChange={(e) => setImza(e.target.value)}
-                  placeholder="Ör. Ayşe Kara"
-                />
+                <div className="kalemSoru">Onay — imzalayın</div>
+                <ImzaPad onDegisti={setImza} />
               </div>
 
               <button className="tamamlaButon" type="submit" disabled={gonderiliyor}>
