@@ -1,11 +1,12 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { cikisYap, kullaniciAl, yoneticiMi } from "../lib/api";
+import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi } from "../lib/api";
 
 export default function UstBar() {
   const router = useRouter();
   const kullanici = typeof window !== "undefined" ? kullaniciAl() : null;
   const yonetici = typeof window !== "undefined" ? yoneticiMi() : false;
+  const isletmeYoneticisi = typeof window !== "undefined" ? isletmeYoneticisiMi() : false;
 
   function cikis() {
     cikisYap();
@@ -21,6 +22,7 @@ export default function UstBar() {
         <nav className="ustBarNav">
           <Link href="/gorevler">Görevlerim</Link>
           {yonetici && <Link href="/santraller">Santraller</Link>}
+          {isletmeYoneticisi && <Link href="/kullanicilar">Kullanıcılar</Link>}
         </nav>
       </div>
       <div className="ustBarSag">
