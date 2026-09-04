@@ -5,6 +5,7 @@ import Link from "next/link";
 import { istekAt, tokenAl } from "../../lib/api";
 import UstBar from "../../components/UstBar";
 import ImzaPad from "../../components/ImzaPad";
+import FotografYukleyici from "../../components/FotografYukleyici";
 
 export default function GorevDetaySayfasi() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function GorevDetaySayfasi() {
   const [cevaplar, setCevaplar] = useState({});
   const [notlar, setNotlar] = useState("");
   const [imza, setImza] = useState(null);
+  const [fotograflar, setFotograflar] = useState([]);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [basarili, setBasarili] = useState(false);
 
@@ -69,7 +71,7 @@ export default function GorevDetaySayfasi() {
         body: JSON.stringify({
           checklist_sonuclari: cevaplar,
           notlar: notlar || null,
-          fotograf_urlleri: [],
+          fotograf_urlleri: fotograflar,
           imza_url: imza,
         }),
       });
@@ -188,6 +190,11 @@ export default function GorevDetaySayfasi() {
                   )}
                 </div>
               ))}
+
+              <div className="kalem">
+                <div className="kalemSoru">Fotoğraf (isteğe bağlı)</div>
+                <FotografYukleyici fotograflar={fotograflar} onDegisti={setFotograflar} />
+              </div>
 
               <div className="kalem">
                 <div className="kalemSoru">Genel not (isteğe bağlı)</div>
