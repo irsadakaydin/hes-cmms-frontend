@@ -22,6 +22,7 @@ export default function UstBar() {
         <nav className="ustBarNav">
           <Link href="/gorevler">Görevlerim</Link>
           {yonetici && <Link href="/santraller">Santraller</Link>}
+          {isletmeYoneticisi && <Link href="/sablonlar">Bakım Şablonları</Link>}
           {isletmeYoneticisi && <Link href="/kullanicilar">Kullanıcılar</Link>}
         </nav>
       </div>
