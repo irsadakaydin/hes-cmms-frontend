@@ -65,6 +65,33 @@ h1, h2, h3 {
   align-items: center;
   justify-content: space-between;
   border-bottom: 3px solid var(--amber);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ustBarSol {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.ustBarNav {
+  display: flex;
+  gap: 16px;
+}
+
+.ustBarNav a {
+  color: #cfe0da;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.ustBarNav a:hover {
+  color: #fff;
+  border-bottom-color: var(--amber);
 }
 
 .ustBarBaslik {
@@ -542,4 +569,76 @@ h1, h2, h3 {
 .fotografEkleButon:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* ---------- Santral / Yönetim ekranları ---------- */
+
+.santralKart {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.santralKart:hover {
+  border-left-color: var(--amber);
+}
+
+.kucukButon {
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.kucukButon:hover:not(:disabled) {
+  background: var(--teal-deep);
+}
+
+.kucukButon:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.yonetimFormu {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.yonetimFormu select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+.satirKart {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.linkButon {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 12px;
+  padding: 0;
+  margin-top: 6px;
+  cursor: pointer;
+  text-decoration: underline;
 }
