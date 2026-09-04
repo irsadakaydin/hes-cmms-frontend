@@ -1,332 +1,299 @@
-const express = require("express");
-const bcrypt = require("bcryptjs");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { withDbContext } = require("../middleware/dbContext");
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+import Head from "next/head";
+import { istekAt, tokenAl, kullaniciAl, isletmeYoneticisiMi } from "../lib/api";
+import UstBar from "../components/UstBar";
 
-const router = express.Router();
-router.use(requireAuth, withDbContext);
+const ROL_ETIKETLERI = {
+  ISLETME_ADMIN: "İşletme Admin",
+  SANTRAL_SORUMLUSU: "Santral Sorumlusu",
+  SAHA_PERSONELI: "Saha Personeli",
+  IZLEYICI: "İzleyici",
+};
 
-const ISLETME_YONETICI_ROLLERI = ["ISLETME_ADMIN", "ADMIN"];
+export default function KullanicilarSayfasi() {
+  const router = useRouter();
+  const [kullanicilar, setKullanicilar] = useState(null);
+  const [santraller, setSantraller] = useState(null);
+  const [hata, setHata] = useState(null);
+  const [bilgi, setBilgi] = useState(null);
 
-/** Hedef kullanıcının, isteği yapanın işletmesiyle aynı işletmede olup olmadığını kontrol eder. */
-async function ayniIsletmedeMi(req, hedefKullaniciId) {
-  const { rows } = await req.db.query(`SELECT isletme_id FROM kullanici WHERE kullanici_id = $1`, [
-    hedefKullaniciId,
-  ]);
-  if (!rows[0]) return { bulundu: false };
-  const ayni = req.user.rol === "ADMIN" || rows[0].isletme_id === req.user.isletme_id;
-  return { bulundu: true, ayni, isletme_id: rows[0].isletme_id };
-}
+  const [formuAcik, setFormuAcik] = useState(false);
+  const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [yeniKullanici, setYeniKullanici] = useState({
+    ad_soyad: "",
+    eposta: "",
+    telefon: "",
+    rol: "SAHA_PERSONELI",
+    sifre: "",
+  });
 
-// GET /api/v1/isletmeler/:isletme_id/kullanicilar
-router.get(
-  "/isletmeler/:isletme_id/kullanicilar",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  const isletmeId = typeof window !== "undefined" ? kullaniciAl()?.isletme_id : null;
+
+  const verileriYukle = useCallback(async () => {
+    if (!isletmeId) return;
     try {
-      const { isletme_id } = req.params;
-      if (req.user.rol !== "ADMIN" && req.user.isletme_id !== isletme_id) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu işletmeye erişim yetkiniz yok." });
-      }
-
-      const { rows } = await req.db.query(
-        `SELECT
-           k.kullanici_id, k.ad_soyad, k.eposta, k.telefon, k.rol, k.aktif_mi, k.son_giris_tarihi,
-           COALESCE(
-             (SELECT json_agg(json_build_object('santral_id', s.santral_id, 'ad', s.ad) ORDER BY s.ad)
-              FROM kullanici_santral ks
-              JOIN santral s ON s.santral_id = ks.santral_id
-              WHERE ks.kullanici_id = k.kullanici_id),
-             '[]'
-           ) AS santral_erisimleri
-         FROM kullanici k
-         WHERE k.isletme_id = $1
-         ORDER BY k.ad_soyad`,
-        [isletme_id]
-      );
-      res.json({ veri: rows });
+      const [k, s] = await Promise.all([
+        istekAt(`/api/v1/isletmeler/${isletmeId}/kullanicilar`),
+        istekAt(`/api/v1/santraller`),
+      ]);
+      setKullanicilar(k.veri);
+      setSantraller(s.veri);
     } catch (err) {
-      next(err);
+      setHata(err.message);
     }
-  }
-);
+  }, [isletmeId]);
 
-// GET /api/v1/kullanicilar/:kullanici_id
-router.get(
-  "/kullanicilar/:kullanici_id",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
-    try {
-      const { bulundu, ayni } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
-
-      const { rows } = await req.db.query(
-        `SELECT kullanici_id, isletme_id, ad_soyad, eposta, telefon, rol, aktif_mi, son_giris_tarihi
-         FROM kullanici WHERE kullanici_id = $1`,
-        [req.params.kullanici_id]
-      );
-
-      const { rows: erisimler } = await req.db.query(
-        `SELECT s.santral_id, s.ad FROM kullanici_santral ks
-         JOIN santral s ON s.santral_id = ks.santral_id
-         WHERE ks.kullanici_id = $1 ORDER BY s.ad`,
-        [req.params.kullanici_id]
-      );
-
-      res.json({ ...rows[0], santral_erisimleri: erisimler });
-    } catch (err) {
-      next(err);
+  useEffect(() => {
+    if (!tokenAl()) {
+      router.replace("/");
+      return;
     }
-  }
-);
+    if (!isletmeYoneticisiMi()) {
+      router.replace("/gorevler");
+      return;
+    }
+    verileriYukle();
+  }, [verileriYukle, router]);
 
-// POST /api/v1/isletmeler/:isletme_id/kullanicilar — yeni kullanıcı davet eder
-router.post(
-  "/isletmeler/:isletme_id/kullanicilar",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  async function kullaniciEkle(e) {
+    e.preventDefault();
+    setHata(null);
+    setBilgi(null);
+    setGonderiliyor(true);
     try {
-      const { isletme_id } = req.params;
-      if (req.user.rol !== "ADMIN" && req.user.isletme_id !== isletme_id) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu işletmeye erişim yetkiniz yok." });
-      }
+      const gonderilecek = { ...yeniKullanici };
+      if (!gonderilecek.sifre) delete gonderilecek.sifre;
 
-      const { ad_soyad, eposta, telefon, rol, sifre } = req.body;
-      const izinliRoller = ["ISLETME_ADMIN", "SANTRAL_SORUMLUSU", "SAHA_PERSONELI", "IZLEYICI"];
-      if (!ad_soyad || !eposta || !rol || !izinliRoller.includes(rol)) {
-        return res.status(400).json({
-          hata_kodu: "EKSIK_ALAN",
-          mesaj: `ad_soyad, eposta ve rol (${izinliRoller.join("/")}) alanları zorunludur.`,
-        });
-      }
-
-      // GM/İşletme Admin bir başlangıç şifresi belirtmişse onu kullan; belirtmemişse
-      // rastgele bir şifre üretip yanıt gövdesinde BİR KEZ döndürüyoruz (daha sonra
-      // tekrar görüntülenemez — şifreler geri döndürülemez şekilde saklanır).
-      let atananSifre = sifre;
-      if (atananSifre && atananSifre.length < 6) {
-        return res.status(400).json({
-          hata_kodu: "GECERSIZ_SIFRE",
-          mesaj: "Şifre en az 6 karakter olmalıdır.",
-        });
-      }
-      if (!atananSifre) {
-        atananSifre = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      }
-      const sifreHash = await bcrypt.hash(atananSifre, 10);
-
-      const { rows } = await req.db.query(
-        `INSERT INTO kullanici (isletme_id, ad_soyad, eposta, sifre_hash, telefon, rol)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING kullanici_id, isletme_id, ad_soyad, eposta, telefon, rol, aktif_mi`,
-        [isletme_id, ad_soyad, eposta, sifreHash, telefon || null, rol]
-      );
-
-      res.status(201).json({
-        kullanici: rows[0],
-        // Yalnızca şifre GM tarafından belirtilmediyse (rastgele üretildiyse) döndürülür —
-        // bu, kullanıcıya bir kez iletilip ardından kaydedilmeyecek geçici bir değerdir.
-        uretilen_sifre: sifre ? undefined : atananSifre,
+      const sonuc = await istekAt(`/api/v1/isletmeler/${isletmeId}/kullanicilar`, {
+        method: "POST",
+        body: JSON.stringify(gonderilecek),
       });
-    } catch (err) {
-      if (err.code === "23505") {
-        return res.status(409).json({ hata_kodu: "EPOSTA_KULLANIMDA", mesaj: "Bu e-posta zaten kayıtlı." });
+
+      if (sonuc.uretilen_sifre) {
+        setBilgi(
+          `Kullanıcı oluşturuldu. Otomatik üretilen şifre: "${sonuc.uretilen_sifre}" — bu şifreyi şimdi not edin, tekrar görüntülenemeyecek.`
+        );
+      } else {
+        setBilgi("Kullanıcı oluşturuldu.");
       }
-      next(err);
+
+      setYeniKullanici({ ad_soyad: "", eposta: "", telefon: "", rol: "SAHA_PERSONELI", sifre: "" });
+      setFormuAcik(false);
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setGonderiliyor(false);
     }
   }
-);
 
-// PATCH /api/v1/kullanicilar/:kullanici_id
-router.patch(
-  "/kullanicilar/:kullanici_id",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  async function sifreSifirla(kullaniciId) {
+    const yeniSifre = prompt("Bu kullanıcı için yeni şifre girin (en az 6 karakter):");
+    if (!yeniSifre) return;
+    setHata(null);
+    setBilgi(null);
     try {
-      const { bulundu, ayni } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
-
-      const izinliAlanlar = ["ad_soyad", "telefon", "rol"];
-      const guncellenecekler = Object.keys(req.body).filter((k) => izinliAlanlar.includes(k));
-      if (guncellenecekler.length === 0) {
-        return res.status(400).json({ hata_kodu: "EKSIK_ALAN", mesaj: "Güncellenecek en az bir alan gönderilmeli." });
-      }
-
-      const setIfadesi = guncellenecekler.map((alan, i) => `${alan} = $${i + 1}`).join(", ");
-      const degerler = guncellenecekler.map((alan) => req.body[alan]);
-
-      const { rows } = await req.db.query(
-        `UPDATE kullanici SET ${setIfadesi} WHERE kullanici_id = $${guncellenecekler.length + 1}
-         RETURNING kullanici_id, ad_soyad, eposta, telefon, rol, aktif_mi`,
-        [...degerler, req.params.kullanici_id]
-      );
-      res.json(rows[0]);
+      await istekAt(`/api/v1/kullanicilar/${kullaniciId}/sifre-sifirla`, {
+        method: "POST",
+        body: JSON.stringify({ yeni_sifre: yeniSifre }),
+      });
+      setBilgi("Şifre güncellendi — yeni şifreyi kullanıcıya iletmeyi unutmayın.");
     } catch (err) {
-      next(err);
+      setHata(err.message);
     }
   }
-);
 
-// POST /api/v1/kullanicilar/:kullanici_id/santral-erisimi
-router.post(
-  "/kullanicilar/:kullanici_id/santral-erisimi",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  async function rolDegistir(kullaniciId, yeniRol) {
+    setHata(null);
     try {
-      const { bulundu, ayni, isletme_id } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
-
-      const { santral_id } = req.body;
-      if (!santral_id) {
-        return res.status(400).json({ hata_kodu: "EKSIK_ALAN", mesaj: "santral_id alanı zorunludur." });
-      }
-
-      // Santral gerçekten aynı işletmeye mi ait — çapraz işletme erişim ataması engellenir
-      const { rows: santralRows } = await req.db.query(
-        `SELECT santral_id FROM santral WHERE santral_id = $1 AND isletme_id = $2`,
-        [santral_id, isletme_id]
-      );
-      if (!santralRows[0]) {
-        return res.status(400).json({
-          hata_kodu: "GECERSIZ_SANTRAL",
-          mesaj: "Belirtilen santral, kullanıcının işletmesine ait değil.",
-        });
-      }
-
-      await req.db.query(
-        `INSERT INTO kullanici_santral (kullanici_id, santral_id) VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
-        [req.params.kullanici_id, santral_id]
-      );
-      res.status(201).json({ mesaj: "Santral erişimi eklendi." });
+      await istekAt(`/api/v1/kullanicilar/${kullaniciId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ rol: yeniRol }),
+      });
+      await verileriYukle();
     } catch (err) {
-      next(err);
+      setHata(err.message);
     }
   }
-);
 
-// DELETE /api/v1/kullanicilar/:kullanici_id/santral-erisimi/:santral_id
-router.delete(
-  "/kullanicilar/:kullanici_id/santral-erisimi/:santral_id",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  async function engelleAcKapa(kullanici) {
+    setHata(null);
     try {
-      const { bulundu, ayni } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
-
-      await req.db.query(
-        `DELETE FROM kullanici_santral WHERE kullanici_id = $1 AND santral_id = $2`,
-        [req.params.kullanici_id, req.params.santral_id]
-      );
-      res.json({ mesaj: "Santral erişimi kaldırıldı." });
+      const yol = kullanici.aktif_mi
+        ? `/api/v1/kullanicilar/${kullanici.kullanici_id}/engelle`
+        : `/api/v1/kullanicilar/${kullanici.kullanici_id}/engeli-kaldir`;
+      await istekAt(yol, { method: "POST" });
+      await verileriYukle();
     } catch (err) {
-      next(err);
+      setHata(err.message);
     }
   }
-);
 
-// POST /api/v1/kullanicilar/:kullanici_id/engelle
-router.post(
-  "/kullanicilar/:kullanici_id/engelle",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  async function santralErisimiEkle(kullaniciId, santralId) {
+    if (!santralId) return;
+    setHata(null);
     try {
-      const { bulundu, ayni } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
-
-      await req.db.query(`UPDATE kullanici SET aktif_mi = FALSE WHERE kullanici_id = $1`, [
-        req.params.kullanici_id,
-      ]);
-      res.json({ mesaj: "Kullanıcı hesabı engellendi." });
+      await istekAt(`/api/v1/kullanicilar/${kullaniciId}/santral-erisimi`, {
+        method: "POST",
+        body: JSON.stringify({ santral_id: santralId }),
+      });
+      await verileriYukle();
     } catch (err) {
-      next(err);
+      setHata(err.message);
     }
   }
-);
 
-// POST /api/v1/kullanicilar/:kullanici_id/engeli-kaldir
-router.post(
-  "/kullanicilar/:kullanici_id/engeli-kaldir",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
+  async function santralErisimiKaldir(kullaniciId, santralId) {
+    setHata(null);
     try {
-      const { bulundu, ayni } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
-
-      await req.db.query(`UPDATE kullanici SET aktif_mi = TRUE WHERE kullanici_id = $1`, [
-        req.params.kullanici_id,
-      ]);
-      res.json({ mesaj: "Kullanıcı hesabının engeli kaldırıldı." });
+      await istekAt(`/api/v1/kullanicilar/${kullaniciId}/santral-erisimi/${santralId}`, {
+        method: "DELETE",
+      });
+      await verileriYukle();
     } catch (err) {
-      next(err);
+      setHata(err.message);
     }
   }
-);
 
-// POST /api/v1/kullanicilar/:kullanici_id/sifre-sifirla — GM/İşletme Admin
-// bir kullanıcıya doğrudan yeni bir şifre belirler (var olan şifre görüntülenemez,
-// yalnızca yenisi atanabilir).
-router.post(
-  "/kullanicilar/:kullanici_id/sifre-sifirla",
-  requireRole(...ISLETME_YONETICI_ROLLERI),
-  async (req, res, next) => {
-    try {
-      const { bulundu, ayni } = await ayniIsletmedeMi(req, req.params.kullanici_id);
-      if (!bulundu) {
-        return res.status(404).json({ hata_kodu: "KULLANICI_BULUNAMADI", mesaj: "Kullanıcı bulunamadı." });
-      }
-      if (!ayni) {
-        return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu kullanıcıya erişim yetkiniz yok." });
-      }
+  return (
+    <>
+      <Head>
+        <title>Kullanıcılar — HES CMMS</title>
+      </Head>
+      <div className="sayfa">
+        <UstBar />
+        <div className="icerik">
+          <div className="bolumBaslik">
+            <h2>Kullanıcılar</h2>
+            <button className="kucukButon" onClick={() => setFormuAcik((v) => !v)}>
+              {formuAcik ? "Vazgeç" : "+ Yeni Kullanıcı"}
+            </button>
+          </div>
 
-      const { yeni_sifre } = req.body;
-      if (!yeni_sifre || yeni_sifre.length < 6) {
-        return res.status(400).json({
-          hata_kodu: "GECERSIZ_SIFRE",
-          mesaj: "yeni_sifre alanı zorunludur ve en az 6 karakter olmalıdır.",
-        });
-      }
+          {hata && <div className="hataKutusu">{hata}</div>}
+          {bilgi && <div className="basariliKutu">{bilgi}</div>}
 
-      const sifreHash = await bcrypt.hash(yeni_sifre, 10);
-      await req.db.query(`UPDATE kullanici SET sifre_hash = $1 WHERE kullanici_id = $2`, [
-        sifreHash,
-        req.params.kullanici_id,
-      ]);
-      res.json({ mesaj: "Şifre güncellendi." });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
+          {formuAcik && (
+            <form onSubmit={kullaniciEkle} className="yonetimFormu">
+              <div className="alan">
+                <label>Ad Soyad</label>
+                <input
+                  required
+                  value={yeniKullanici.ad_soyad}
+                  onChange={(e) => setYeniKullanici({ ...yeniKullanici, ad_soyad: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>E-posta (kullanıcı adı)</label>
+                <input
+                  required
+                  type="email"
+                  value={yeniKullanici.eposta}
+                  onChange={(e) => setYeniKullanici({ ...yeniKullanici, eposta: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>Telefon (isteğe bağlı)</label>
+                <input
+                  value={yeniKullanici.telefon}
+                  onChange={(e) => setYeniKullanici({ ...yeniKullanici, telefon: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>Rol</label>
+                <select
+                  value={yeniKullanici.rol}
+                  onChange={(e) => setYeniKullanici({ ...yeniKullanici, rol: e.target.value })}
+                >
+                  {Object.entries(ROL_ETIKETLERI).map(([deger, etiket]) => (
+                    <option key={deger} value={deger}>
+                      {etiket}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="alan">
+                <label>Şifre (boş bırakılırsa otomatik üretilir)</label>
+                <input
+                  type="text"
+                  value={yeniKullanici.sifre}
+                  onChange={(e) => setYeniKullanici({ ...yeniKullanici, sifre: e.target.value })}
+                  placeholder="En az 6 karakter"
+                />
+              </div>
+              <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+                {gonderiliyor ? "Ekleniyor…" : "Kullanıcıyı Ekle"}
+              </button>
+            </form>
+          )}
 
-module.exports = router;
+          {!kullanicilar && <div className="yukleniyor">Yükleniyor…</div>}
+
+          {kullanicilar &&
+            kullanicilar.map((k) => (
+              <div className="satirKart" key={k.kullanici_id}>
+                <div className="kullaniciUst">
+                  <div>
+                    <strong>{k.ad_soyad}</strong> — {k.eposta}
+                    {!k.aktif_mi && <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>Engelli</span>}
+                  </div>
+                </div>
+
+                <div className="kullaniciSatir">
+                  <label>Rol:</label>
+                  <select value={k.rol} onChange={(e) => rolDegistir(k.kullanici_id, e.target.value)}>
+                    {Object.entries(ROL_ETIKETLERI).map(([deger, etiket]) => (
+                      <option key={deger} value={deger}>
+                        {etiket}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {k.rol !== "ISLETME_ADMIN" && (
+                  <div className="kullaniciSatir">
+                    <label>Santral erişimi:</label>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        santralErisimiEkle(k.kullanici_id, e.target.value);
+                        e.target.value = "";
+                      }}
+                    >
+                      <option value="" disabled>
+                        + Santral ekle…
+                      </option>
+                      {santraller &&
+                        santraller.map((s) => (
+                          <option key={s.santral_id} value={s.santral_id}>
+                            {s.ad}
+                          </option>
+                        ))}
+                    </select>
+                    <span className="santralEtiketleri">
+                      {(k.santral_erisimleri || []).map((s) => (
+                        <span key={s.santral_id} className="santralEtiket">
+                          {s.ad}
+                          <button onClick={() => santralErisimiKaldir(k.kullanici_id, s.santral_id)}>×</button>
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
+
+                <div className="kullaniciAlt">
+                  <button className="linkButon" onClick={() => sifreSifirla(k.kullanici_id)}>
+                    Şifreyi sıfırla
+                  </button>
+                  <button className="linkButon" onClick={() => engelleAcKapa(k)}>
+                    {k.aktif_mi ? "Hesabı engelle" : "Engeli kaldır"}
+                  </button>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </>
+  );
+}
