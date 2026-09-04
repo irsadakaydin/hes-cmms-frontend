@@ -1,0 +1,487 @@
+:root {
+  /* Renk — HES/su temalı derin çamlaşım tonu + endüstriyel gösterge ambresi */
+  --ink: #13201c;
+  --ink-soft: #4d5c55;
+  --paper: #eef1ee;
+  --surface: #ffffff;
+  --line: #d3dad2;
+  --line-strong: #aab5a7;
+  --teal: #0f3d3e;
+  --teal-deep: #092829;
+  --amber: #c17a24;
+  --amber-soft: #f4e3c9;
+  --red: #a83b2e;
+  --red-soft: #f5dcd7;
+  --green: #2c7a4b;
+  --green-soft: #dcefe1;
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+/* ---------- Layout ---------- */
+
+.sayfa {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ustBar {
+  background: var(--teal);
+  color: #f4f6f2;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--amber);
+}
+
+.ustBarBaslik {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ustBarBaslik small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: #b9c9c2;
+}
+
+.ustBarSag {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: #cfe0da;
+}
+
+.cikisLink {
+  background: none;
+  border: 1px solid #3c6a68;
+  color: #eef1ee;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cikisLink:hover {
+  background: var(--teal-deep);
+}
+
+.icerik {
+  flex: 1;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+/* ---------- Giriş sayfası ---------- */
+
+.girisSayfasi {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(180deg, var(--teal-deep) 0%, var(--teal) 100%);
+  padding: 20px;
+}
+
+.girisKutu {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border-top: 4px solid var(--amber);
+  padding: 32px 28px 28px;
+}
+
+.girisUst {
+  margin-bottom: 26px;
+}
+
+.girisUst .etiket {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.girisUst h1 {
+  font-size: 22px;
+  color: var(--teal-deep);
+  line-height: 1.25;
+}
+
+.alan {
+  margin-bottom: 16px;
+}
+
+.alan label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.alan input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 15px;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+.alan input:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  background: var(--surface);
+}
+
+.birincilButon {
+  width: 100%;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.birincilButon:hover:not(:disabled) {
+  background: var(--teal-deep);
+}
+
+.birincilButon:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.hataKutusu {
+  background: var(--red-soft);
+  border-left: 3px solid var(--red);
+  color: #6e241a;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ---------- Görev listesi ---------- */
+
+.bolumBaslik {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.bolumBaslik h2 {
+  font-size: 20px;
+  color: var(--teal-deep);
+}
+
+.bolumBaslik .sayac {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.gorevKart {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.gorevKart:hover {
+  border-left-color: var(--teal);
+}
+
+.gorevKart.durum-GECIKTI {
+  border-left-color: var(--red);
+}
+
+.gorevKart.durum-BEKLIYOR {
+  border-left-color: var(--amber);
+}
+
+.gorevUst {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.gorevSantral {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.rozet {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.rozet-BEKLIYOR {
+  background: var(--amber-soft);
+  color: #7a4d13;
+}
+
+.rozet-GECIKTI {
+  background: var(--red-soft);
+  color: #6e241a;
+}
+
+.rozet-DEVAM_EDIYOR {
+  background: #dbe6f0;
+  color: #1d4e75;
+}
+
+.gorevAlt {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.gorevTarih {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+.bosDurum {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ink-soft);
+}
+
+.yukleniyor {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ---------- Görev detay / checklist ---------- */
+
+.geriLink {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--teal);
+  margin-bottom: 16px;
+  text-decoration: none;
+}
+
+.detayUst {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.detayUst h2 {
+  font-size: 19px;
+  color: var(--teal-deep);
+  margin-bottom: 4px;
+}
+
+.detayAlt {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.kalem {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 16px 18px;
+  margin-bottom: 10px;
+}
+
+.kalemSoru {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.evetHayirGrup {
+  display: flex;
+  gap: 10px;
+}
+
+.evetHayirGrup button {
+  flex: 1;
+  padding: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.evetHayirGrup button.secili-evet {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: #1c5433;
+  font-weight: 600;
+}
+
+.evetHayirGrup button.secili-hayir {
+  background: var(--red-soft);
+  border-color: var(--red);
+  color: #6e241a;
+  font-weight: 600;
+}
+
+.olcumSatiri {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.olcumSatiri input {
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.olcumBirim {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.kalemSoru textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.tamamlaButon {
+  width: 100%;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.tamamlaButon:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.basariliKutu {
+  background: var(--green-soft);
+  border-left: 3px solid var(--green);
+  color: #1c5433;
+  padding: 16px 18px;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+/* ---------- İmza Pad ---------- */
+
+.imzaAlani {
+  position: relative;
+}
+
+.imzaCanvas {
+  width: 100%;
+  height: 160px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  touch-action: none;
+  display: block;
+  cursor: crosshair;
+}
+
+.imzaIpucu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.imzaTemizleButon {
+  margin-top: 8px;
+  background: none;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.imzaTemizleButon:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+}
