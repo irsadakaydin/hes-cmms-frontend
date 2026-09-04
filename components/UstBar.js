@@ -1,9 +1,11 @@
 import { useRouter } from "next/router";
-import { cikisYap, kullaniciAl } from "../lib/api";
+import Link from "next/link";
+import { cikisYap, kullaniciAl, yoneticiMi } from "../lib/api";
 
 export default function UstBar() {
   const router = useRouter();
   const kullanici = typeof window !== "undefined" ? kullaniciAl() : null;
+  const yonetici = typeof window !== "undefined" ? yoneticiMi() : false;
 
   function cikis() {
     cikisYap();
@@ -12,8 +14,14 @@ export default function UstBar() {
 
   return (
     <div className="ustBar">
-      <div className="ustBarBaslik">
-        HES CMMS <small>Bakım Yönetim Sistemi</small>
+      <div className="ustBarSol">
+        <div className="ustBarBaslik">
+          HES CMMS <small>Bakım Yönetim Sistemi</small>
+        </div>
+        <nav className="ustBarNav">
+          <Link href="/gorevler">Görevlerim</Link>
+          {yonetici && <Link href="/santraller">Santraller</Link>}
+        </nav>
       </div>
       <div className="ustBarSag">
         {kullanici && <span>{kullanici.ad_soyad}</span>}
