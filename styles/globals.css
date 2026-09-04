@@ -648,3 +648,60 @@ h1, h2, h3 {
   cursor: pointer;
   text-decoration: underline;
 }
+
+.kullaniciUst {
+  margin-bottom: 8px;
+}
+
+.kullaniciSatir {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.kullaniciSatir select {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 13px;
+  font-family: var(--font-body);
+}
+
+.kullaniciAlt {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.kullaniciAlt .linkButon {
+  margin-top: 0;
+}
+
+.santralEtiketleri {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.santralEtiket {
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 3px 6px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.santralEtiket button {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
