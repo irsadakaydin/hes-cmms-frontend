@@ -5,11 +5,22 @@ import { istekAt, tokenAl, kullaniciAl, isletmeYoneticisiMi } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 const ROL_ETIKETLERI = {
+  ADMIN: "Platform Admin",
   ISLETME_ADMIN: "İşletme Admin",
   SANTRAL_SORUMLUSU: "Santral Sorumlusu",
   SAHA_PERSONELI: "Saha Personeli",
   IZLEYICI: "İzleyici",
 };
+
+// Platform Admin (ADMIN) seçeneği yalnızca oturum açan kullanıcı zaten
+// Platform Admin ise gösterilir — bir İşletme Admin başka birini
+// Platform Admin yapamaz (bu, backend'de de ayrıca zorlanıyor).
+function rolSecenekleri() {
+  const kendiRol = kullaniciAl()?.rol;
+  if (kendiRol === "ADMIN") return ROL_ETIKETLERI;
+  const { ADMIN, ...digerleri } = ROL_ETIKETLERI;
+  return digerleri;
+}
 
 export default function KullanicilarSayfasi() {
   const router = useRouter();
@@ -206,7 +217,7 @@ export default function KullanicilarSayfasi() {
                   value={yeniKullanici.rol}
                   onChange={(e) => setYeniKullanici({ ...yeniKullanici, rol: e.target.value })}
                 >
-                  {Object.entries(ROL_ETIKETLERI).map(([deger, etiket]) => (
+                  {Object.entries(rolSecenekleri()).map(([deger, etiket]) => (
                     <option key={deger} value={deger}>
                       {etiket}
                     </option>
@@ -242,12 +253,18 @@ export default function KullanicilarSayfasi() {
 
                 <div className="kullaniciSatir">
                   <label>Rol:</label>
-                  <select value={k.rol} onChange={(e) => rolDegistir(k.kullanici_id, e.target.value)}>
-                    {Object.entries(ROL_ETIKETLERI).map(([deger, etiket]) => (
-                      <option key={deger} value={deger}>
-                        {etiket}
-                      </option>
-                    ))}
+                  <select
+                    value={k.rol}
+                    disabled={k.rol === "ADMIN" && kullaniciAl()?.rol !== "ADMIN"}
+                    onChange={(e) => rolDegistir(k.kullanici_id, e.target.value)}
+                  >
+                    {Object.entries(k.rol === "ADMIN" ? ROL_ETIKETLERI : rolSecenekleri()).map(
+                      ([deger, etiket]) => (
+                        <option key={deger} value={deger}>
+                          {etiket}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
 
