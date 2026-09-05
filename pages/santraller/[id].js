@@ -22,6 +22,41 @@ const ROL_KISA_ETIKET = {
   IZLEYICI: "İzleyici",
 };
 
+const DONEM_ETIKETLERI = {
+  GUNLUK: "Bugün",
+  HAFTALIK: "Son 7 Gün",
+  AYLIK: "Bu Ay",
+  YILLIK: "Bu Yıl",
+  TUM_ZAMANLAR: "Tüm Zamanlar",
+};
+
+/** Seçilen dönem etiketini gerçek tarih aralığına çevirir (YYYY-AA-GG). */
+function donemTarihAraligi(donem) {
+  const bugun = new Date();
+  const gunFormatla = (d) => d.toISOString().slice(0, 10);
+  const bitis = gunFormatla(bugun);
+
+  switch (donem) {
+    case "GUNLUK":
+      return { baslangic: bitis, bitis };
+    case "HAFTALIK": {
+      const d = new Date(bugun);
+      d.setDate(d.getDate() - 6);
+      return { baslangic: gunFormatla(d), bitis };
+    }
+    case "AYLIK": {
+      const d = new Date(bugun.getFullYear(), bugun.getMonth(), 1);
+      return { baslangic: gunFormatla(d), bitis };
+    }
+    case "YILLIK": {
+      const d = new Date(bugun.getFullYear(), 0, 1);
+      return { baslangic: gunFormatla(d), bitis };
+    }
+    default:
+      return {};
+  }
+}
+
 export default function SantralDetaySayfasi() {
   const router = useRouter();
   const { id } = router.query;
@@ -36,6 +71,7 @@ export default function SantralDetaySayfasi() {
   const [planFormuAcik, setPlanFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [raporIndiriliyor, setRaporIndiriliyor] = useState(false);
+  const [raporDonemi, setRaporDonemi] = useState("TUM_ZAMANLAR");
 
   const [yeniEkipman, setYeniEkipman] = useState({ ad: "", tip: "", seri_no: "", uretici: "" });
   const [duzenlenenEkipman, setDuzenlenenEkipman] = useState(null);
@@ -183,9 +219,15 @@ export default function SantralDetaySayfasi() {
     setRaporIndiriliyor(true);
     try {
       const uzanti = format === "pdf" ? "pdf" : "xlsx";
+      const { baslangic, bitis } = donemTarihAraligi(raporDonemi);
+      const parametreler = new URLSearchParams();
+      if (baslangic) parametreler.set("baslangic", baslangic);
+      if (bitis) parametreler.set("bitis", bitis);
+      const sorguMetni = parametreler.toString() ? `?${parametreler.toString()}` : "";
+
       await dosyaIndir(
-        `/api/v1/raporlar/santral/${id}/${format}`,
-        `bakim-raporu-${santral.ad.replace(/\s+/g, "-")}.${uzanti}`
+        `/api/v1/raporlar/santral/${id}/${format}${sorguMetni}`,
+        `bakim-raporu-${santral.ad.replace(/\s+/g, "-")}-${raporDonemi}.${uzanti}`
       );
     } catch (err) {
       setHata(err.message);
@@ -223,6 +265,17 @@ export default function SantralDetaySayfasi() {
               {santral.konum} {santral.turbin_tipi ? `— ${santral.turbin_tipi}` : ""}
             </div>
             <div className="raporButonlari">
+              <select
+                value={raporDonemi}
+                onChange={(e) => setRaporDonemi(e.target.value)}
+                style={{ padding: "8px 10px", border: "1px solid var(--line-strong)", background: "var(--paper)", fontSize: "13px" }}
+              >
+                {Object.entries(DONEM_ETIKETLERI).map(([deger, etiket]) => (
+                  <option key={deger} value={deger}>
+                    {etiket}
+                  </option>
+                ))}
+              </select>
               <button className="kucukButon" onClick={() => raporIndir("pdf")} disabled={raporIndiriliyor}>
                 {raporIndiriliyor ? "Hazırlanıyor…" : "PDF Rapor İndir"}
               </button>
