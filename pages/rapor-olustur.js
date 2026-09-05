@@ -99,7 +99,14 @@ export default function RaporOlusturSayfasi() {
       const sorguMetni = parametreler.toString() ? `?${parametreler.toString()}` : "";
 
       const uzanti = format === "pdf" ? "pdf" : "xlsx";
-      await dosyaIndir(`/api/v1/raporlar/${format}${sorguMetni}`, `bakim-raporu.${uzanti}`);
+
+      const santralAdi = santralId
+        ? santraller.find((s) => s.santral_id === santralId)?.ad || "Santral"
+        : "Tüm Santraller";
+      const periyotAdi = periyot ? PERIYOT_ETIKETLERI[periyot] || periyot : "Tüm Periyotlar";
+      const dosyaAdi = `${santralAdi} (${periyotAdi}) Bakım Raporu.${uzanti}`;
+
+      await dosyaIndir(`/api/v1/raporlar/${format}${sorguMetni}`, dosyaAdi);
     } catch (err) {
       setHata(err.message);
     } finally {
