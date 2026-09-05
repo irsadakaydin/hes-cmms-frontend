@@ -24,6 +24,11 @@ function rolSecenekleri() {
 
 export default function KullanicilarSayfasi() {
   const router = useRouter();
+  const kendiIsletmeId = typeof window !== "undefined" ? kullaniciAl()?.isletme_id : null;
+  const platformAdminMi = typeof window !== "undefined" && kullaniciAl()?.rol === "ADMIN";
+
+  const [goruntulenenIsletmeId, setGoruntulenenIsletmeId] = useState(kendiIsletmeId);
+  const [isletmeler, setIsletmeler] = useState(null);
   const [kullanicilar, setKullanicilar] = useState(null);
   const [santraller, setSantraller] = useState(null);
   const [hata, setHata] = useState(null);
@@ -31,6 +36,7 @@ export default function KullanicilarSayfasi() {
 
   const [formuAcik, setFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [tumHoldingEkleniyor, setTumHoldingEkleniyor] = useState(null);
   const [yeniKullanici, setYeniKullanici] = useState({
     ad_soyad: "",
     eposta: "",
@@ -39,21 +45,23 @@ export default function KullanicilarSayfasi() {
     sifre: "",
   });
 
-  const isletmeId = typeof window !== "undefined" ? kullaniciAl()?.isletme_id : null;
-
   const verileriYukle = useCallback(async () => {
-    if (!isletmeId) return;
+    if (!goruntulenenIsletmeId) return;
     try {
-      const [k, s] = await Promise.all([
-        istekAt(`/api/v1/isletmeler/${isletmeId}/kullanicilar`),
+      const istekler = [
+        istekAt(`/api/v1/isletmeler/${goruntulenenIsletmeId}/kullanicilar`),
         istekAt(`/api/v1/santraller`),
-      ]);
-      setKullanicilar(k.veri);
-      setSantraller(s.veri);
+      ];
+      if (platformAdminMi) istekler.push(istekAt(`/api/v1/isletmeler`));
+
+      const sonuclar = await Promise.all(istekler);
+      setKullanicilar(sonuclar[0].veri);
+      setSantraller(sonuclar[1].veri);
+      if (platformAdminMi) setIsletmeler(sonuclar[2].veri);
     } catch (err) {
       setHata(err.message);
     }
-  }, [isletmeId]);
+  }, [goruntulenenIsletmeId, platformAdminMi]);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -76,7 +84,7 @@ export default function KullanicilarSayfasi() {
       const gonderilecek = { ...yeniKullanici };
       if (!gonderilecek.sifre) delete gonderilecek.sifre;
 
-      const sonuc = await istekAt(`/api/v1/isletmeler/${isletmeId}/kullanicilar`, {
+      const sonuc = await istekAt(`/api/v1/isletmeler/${goruntulenenIsletmeId}/kullanicilar`, {
         method: "POST",
         body: JSON.stringify(gonderilecek),
       });
@@ -167,6 +175,32 @@ export default function KullanicilarSayfasi() {
     }
   }
 
+  // "Bu holdingin tümünü ekle" — o holdingdeki her santral için tek tek erişim ekler.
+  async function holdinginTumunuEkle(kullanici) {
+    setHata(null);
+    setTumHoldingEkleniyor(kullanici.kullanici_id);
+    try {
+      const zatenVarOlanlar = new Set((kullanici.santral_erisimleri || []).map((s) => s.santral_id));
+      const eklenecekler = (gosterilecekSantraller || []).filter((s) => !zatenVarOlanlar.has(s.santral_id));
+      for (const s of eklenecekler) {
+        await istekAt(`/api/v1/kullanicilar/${kullanici.kullanici_id}/santral-erisimi`, {
+          method: "POST",
+          body: JSON.stringify({ santral_id: s.santral_id }),
+        });
+      }
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setTumHoldingEkleniyor(null);
+    }
+  }
+
+  // Görüntülenen holdinge ait santraller — santral erişimi listelerinde
+  // yalnızca BU holdingin santralleri gösterilir (başka holdingin santrali
+  // zaten backend tarafından reddedilir, ama arayüzde hiç göstermemek daha net).
+  const gosterilecekSantraller = (santraller || []).filter((s) => s.isletme_id === goruntulenenIsletmeId);
+
   return (
     <>
       <Head>
@@ -181,6 +215,22 @@ export default function KullanicilarSayfasi() {
               {formuAcik ? "Vazgeç" : "+ Yeni Kullanıcı"}
             </button>
           </div>
+
+          {platformAdminMi && isletmeler && (
+            <div className="alan" style={{ maxWidth: "320px", marginBottom: "18px" }}>
+              <label>Holding</label>
+              <select
+                value={goruntulenenIsletmeId || ""}
+                onChange={(e) => setGoruntulenenIsletmeId(e.target.value)}
+              >
+                {isletmeler.map((i) => (
+                  <option key={i.isletme_id} value={i.isletme_id}>
+                    {i.ad}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {hata && <div className="hataKutusu">{hata}</div>}
           {bilgi && <div className="basariliKutu">{bilgi}</div>}
@@ -268,7 +318,7 @@ export default function KullanicilarSayfasi() {
                   </select>
                 </div>
 
-                {k.rol !== "ISLETME_ADMIN" && (
+                {k.rol !== "ISLETME_ADMIN" && k.rol !== "ADMIN" && (
                   <div className="kullaniciSatir">
                     <label>Santral erişimi:</label>
                     <select
@@ -281,13 +331,23 @@ export default function KullanicilarSayfasi() {
                       <option value="" disabled>
                         + Santral ekle…
                       </option>
-                      {santraller &&
-                        santraller.map((s) => (
-                          <option key={s.santral_id} value={s.santral_id}>
-                            {s.ad}
-                          </option>
-                        ))}
+                      {gosterilecekSantraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad}
+                        </option>
+                      ))}
                     </select>
+                    <button
+                      type="button"
+                      className="kucukButon"
+                      style={{ fontSize: "12px", padding: "5px 10px" }}
+                      onClick={() => holdinginTumunuEkle(k)}
+                      disabled={tumHoldingEkleniyor === k.kullanici_id}
+                    >
+                      {tumHoldingEkleniyor === k.kullanici_id
+                        ? "Ekleniyor…"
+                        : "Bu holdingin tümünü ekle"}
+                    </button>
                     <span className="santralEtiketleri">
                       {(k.santral_erisimleri || []).map((s) => (
                         <span key={s.santral_id} className="santralEtiket">
