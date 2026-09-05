@@ -30,6 +30,7 @@ export default function SantralDetaySayfasi() {
   const [raporIndiriliyor, setRaporIndiriliyor] = useState(false);
 
   const [yeniEkipman, setYeniEkipman] = useState({ ad: "", tip: "", seri_no: "", uretici: "" });
+  const [duzenlenenEkipman, setDuzenlenenEkipman] = useState(null);
   const [yeniPlan, setYeniPlan] = useState({
     ekipman_id: "",
     sablon_id: "",
@@ -40,11 +41,16 @@ export default function SantralDetaySayfasi() {
   const verileriYukle = useCallback(async () => {
     if (!id) return;
     try {
-      const [s, e, p, sb] = await Promise.all([
-        istekAt(`/api/v1/santraller/${id}`),
+      // Santral bilgisini ÖNCE alıyoruz — şablon listesini o santralin
+      // bağlı olduğu holdinge göre filtrelemek için isletme_id'sine ihtiyacımız var.
+      // (Platform Admin için şablon uç noktası filtre verilmezse TÜM holdinglerin
+      // şablonlarını döner — bu, yanlış holdingden şablon seçilmesine yol açardı.)
+      const s = await istekAt(`/api/v1/santraller/${id}`);
+
+      const [e, p, sb] = await Promise.all([
         istekAt(`/api/v1/santraller/${id}/ekipmanlar`),
         istekAt(`/api/v1/santraller/${id}/bakim-planlari`),
-        istekAt(`/api/v1/bakim-sablonlari`),
+        istekAt(`/api/v1/bakim-sablonlari?isletme_id=${s.isletme_id}`),
       ]);
       setSantral(s);
       setEkipmanlar(e.veri);
@@ -66,6 +72,37 @@ export default function SantralDetaySayfasi() {
     }
     verileriYukle();
   }, [verileriYukle, router]);
+
+  async function ekipmaniGuncelle(e) {
+    e.preventDefault();
+    setHata(null);
+    setGonderiliyor(true);
+    try {
+      const { ekipman_id, ad, tip, seri_no, uretici } = duzenlenenEkipman;
+      await istekAt(`/api/v1/ekipmanlar/${ekipman_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ad, tip, seri_no, uretici }),
+      });
+      setDuzenlenenEkipman(null);
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setGonderiliyor(false);
+    }
+  }
+
+  async function ekipmaniSil(ekipmanId) {
+    if (!confirm("Bu ekipmanı pasifleştirmek istediğinize emin misiniz? (HURDA olarak işaretlenir, silinmez.)"))
+      return;
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/ekipmanlar/${ekipmanId}`, { method: "DELETE" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
 
   async function ekipmanEkle(e) {
     e.preventDefault();
@@ -224,17 +261,93 @@ export default function SantralDetaySayfasi() {
             <div className="bosDurum">Bu santrale henüz ekipman eklenmemiş.</div>
           )}
           {ekipmanlar &&
-            ekipmanlar.map((e) => (
-              <div className="satirKart" key={e.ekipman_id}>
-                <div>
-                  <strong>{e.ad}</strong> — {e.tip}
+            ekipmanlar.map((e) =>
+              duzenlenenEkipman?.ekipman_id === e.ekipman_id ? (
+                <form onSubmit={ekipmaniGuncelle} className="yonetimFormu" key={e.ekipman_id}>
+                  <div className="alan">
+                    <label>Ekipman adı</label>
+                    <input
+                      required
+                      value={duzenlenenEkipman.ad}
+                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, ad: ev.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
+                    <label>Tip</label>
+                    <input
+                      required
+                      value={duzenlenenEkipman.tip}
+                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, tip: ev.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
+                    <label>Seri no</label>
+                    <input
+                      value={duzenlenenEkipman.seri_no || ""}
+                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, seri_no: ev.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
+                    <label>Üretici</label>
+                    <input
+                      value={duzenlenenEkipman.uretici || ""}
+                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, uretici: ev.target.value })}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+                      Kaydet
+                    </button>
+                    <button
+                      type="button"
+                      className="kucukButon"
+                      onClick={() => setDuzenlenenEkipman(null)}
+                      style={{ background: "var(--ink-soft)" }}
+                    >
+                      Vazgeç
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="satirKart" key={e.ekipman_id}>
+                  <div>
+                    <strong>{e.ad}</strong> — {e.tip}
+                    {e.durum === "HURDA" && (
+                      <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
+                        Pasif
+                      </span>
+                    )}
+                  </div>
+                  <div className="gorevAlt">
+                    {e.uretici && `${e.uretici} `}
+                    {e.seri_no && `· ${e.seri_no}`}
+                  </div>
+                  <div className="kullaniciAlt">
+                    <button className="linkButon" onClick={() => setDuzenlenenEkipman(e)}>
+                      Düzenle
+                    </button>
+                    {e.durum === "HURDA" ? (
+                      <button
+                        className="linkButon"
+                        onClick={async () => {
+                          await istekAt(`/api/v1/ekipmanlar/${e.ekipman_id}`, {
+                            method: "PATCH",
+                            body: JSON.stringify({ durum: "AKTIF" }),
+                          });
+                          await verileriYukle();
+                        }}
+                      >
+                        Yeniden aktifleştir
+                      </button>
+                    ) : (
+                      <button className="linkButon" onClick={() => ekipmaniSil(e.ekipman_id)}>
+                        Sil (pasifleştir)
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="gorevAlt">
-                  {e.uretici && `${e.uretici} `}
-                  {e.seri_no && `· ${e.seri_no}`}
-                </div>
-              </div>
-            ))}
+              )
+            )}
 
           {/* ---------- Bakım Planları ---------- */}
           <div className="bolumBaslik" style={{ marginTop: "32px" }}>
@@ -271,20 +384,31 @@ export default function SantralDetaySayfasi() {
                 </select>
               </div>
               <div className="alan">
-                <label>Bakım şablonu</label>
+                <label>
+                  Bakım şablonu <span className="kutuphaneEtiketi">— {santral.isletme_adi} Kütüphanesi</span>
+                </label>
                 <select
                   required
                   value={yeniPlan.sablon_id}
                   onChange={(e) => setYeniPlan({ ...yeniPlan, sablon_id: e.target.value })}
                 >
                   <option value="">Seçin…</option>
-                  {sablonlar &&
-                    sablonlar.map((s) => (
-                      <option key={s.sablon_id} value={s.sablon_id}>
-                        {s.ad} ({s.ekipman_tipi})
-                      </option>
-                    ))}
+                  {sablonlar && sablonlar.length > 0 && (
+                    <optgroup label={`${santral.isletme_adi} Kütüphanesi`}>
+                      {sablonlar.map((s) => (
+                        <option key={s.sablon_id} value={s.sablon_id}>
+                          {s.ad} ({s.ekipman_tipi})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                {sablonlar && sablonlar.length === 0 && (
+                  <div className="kutuphaneBosUyari">
+                    {santral.isletme_adi} kütüphanesinde henüz bakım şablonu yok —{" "}
+                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından ekleyin.
+                  </div>
+                )}
               </div>
               <div className="alan">
                 <label>Periyot</label>
