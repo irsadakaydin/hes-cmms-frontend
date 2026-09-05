@@ -42,6 +42,7 @@ export default function SablonlarSayfasi() {
   const [formuAcik, setFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosSablon(kendiIsletmeId));
+  const [duzenlenenSablonId, setDuzenlenenSablonId] = useState(null);
 
   const verileriYukle = useCallback(async () => {
     try {
@@ -70,9 +71,29 @@ export default function SablonlarSayfasi() {
 
   function yeniSablonBaslat() {
     setTaslak(bosSablon(kendiIsletmeId));
+    setDuzenlenenSablonId(null);
     setFormuAcik(true);
     setBilgi(null);
     setHata(null);
+  }
+
+  async function duzenlemeyiBaslat(sablonOzet) {
+    setHata(null);
+    setBilgi(null);
+    try {
+      const s = await istekAt(`/api/v1/bakim-sablonlari/${sablonOzet.sablon_id}`);
+      setTaslak({
+        ad: s.ad,
+        ekipman_tipi: s.ekipman_tipi,
+        periyot_tipi: s.periyot_tipi,
+        isletme_id: s.isletme_id,
+        kalemler: (s.checklist_json?.kalemler || []).map((k) => ({ ...k })),
+      });
+      setDuzenlenenSablonId(s.sablon_id);
+      setFormuAcik(true);
+    } catch (err) {
+      setHata(err.message);
+    }
   }
 
   function kalemEkle() {
@@ -139,18 +160,32 @@ export default function SablonlarSayfasi() {
 
     setGonderiliyor(true);
     try {
-      await istekAt("/api/v1/bakim-sablonlari", {
-        method: "POST",
-        body: JSON.stringify({
-          ad: taslak.ad,
-          ekipman_tipi: taslak.ekipman_tipi,
-          periyot_tipi: taslak.periyot_tipi,
-          checklist_json: { kalemler: taslak.kalemler },
-          isletme_id: taslak.isletme_id,
-        }),
-      });
-      setBilgi("Bakım şablonu kaydedildi.");
+      if (duzenlenenSablonId) {
+        await istekAt(`/api/v1/bakim-sablonlari/${duzenlenenSablonId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ad: taslak.ad,
+            ekipman_tipi: taslak.ekipman_tipi,
+            periyot_tipi: taslak.periyot_tipi,
+            checklist_json: { kalemler: taslak.kalemler },
+          }),
+        });
+        setBilgi("Şablon güncellendi — yeni bir versiyon olarak kaydedildi, eski versiyon pasifleşti.");
+      } else {
+        await istekAt("/api/v1/bakim-sablonlari", {
+          method: "POST",
+          body: JSON.stringify({
+            ad: taslak.ad,
+            ekipman_tipi: taslak.ekipman_tipi,
+            periyot_tipi: taslak.periyot_tipi,
+            checklist_json: { kalemler: taslak.kalemler },
+            isletme_id: taslak.isletme_id,
+          }),
+        });
+        setBilgi("Bakım şablonu kaydedildi.");
+      }
       setFormuAcik(false);
+      setDuzenlenenSablonId(null);
       await verileriYukle();
     } catch (err) {
       setHata(err.message);
@@ -191,7 +226,7 @@ export default function SablonlarSayfasi() {
 
           {formuAcik && (
             <form onSubmit={sablonuKaydet} className="yonetimFormu">
-              {platformAdminMi && isletmeler && (
+              {platformAdminMi && isletmeler && !duzenlenenSablonId && (
                 <div className="alan">
                   <label>Holding</label>
                   <select
@@ -275,9 +310,24 @@ export default function SablonlarSayfasi() {
                 + Madde Ekle
               </button>
 
-              <div>
+              <div style={{ display: "flex", gap: "10px" }}>
                 <button className="birincilButon" type="submit" disabled={gonderiliyor}>
-                  {gonderiliyor ? "Kaydediliyor…" : "Şablonu Kaydet"}
+                  {gonderiliyor
+                    ? "Kaydediliyor…"
+                    : duzenlenenSablonId
+                    ? "Yeni Versiyon Olarak Kaydet"
+                    : "Şablonu Kaydet"}
+                </button>
+                <button
+                  type="button"
+                  className="kucukButon"
+                  style={{ background: "var(--ink-soft)" }}
+                  onClick={() => {
+                    setFormuAcik(false);
+                    setDuzenlenenSablonId(null);
+                  }}
+                >
+                  Vazgeç
                 </button>
               </div>
             </form>
@@ -296,6 +346,11 @@ export default function SablonlarSayfasi() {
                 </div>
                 <div className="gorevAlt">
                   {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi} · v{s.versiyon}
+                </div>
+                <div className="kullaniciAlt">
+                  <button className="linkButon" onClick={() => duzenlemeyiBaslat(s)}>
+                    Düzenle
+                  </button>
                 </div>
               </div>
             ))}
