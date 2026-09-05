@@ -69,6 +69,7 @@ export default function SantralDetaySayfasi() {
 
   const [ekipmanFormuAcik, setEkipmanFormuAcik] = useState(false);
   const [planFormuAcik, setPlanFormuAcik] = useState(false);
+  const [planGorunumu, setPlanGorunumu] = useState("DEVAM_EDEN");
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [raporIndiriliyor, setRaporIndiriliyor] = useState(false);
   const [raporDonemi, setRaporDonemi] = useState("TUM_ZAMANLAR");
@@ -554,11 +555,38 @@ export default function SantralDetaySayfasi() {
           )}
 
           {!planlar && <div className="yukleniyor">Yükleniyor…</div>}
-          {planlar && planlar.length === 0 && (
-            <div className="bosDurum">Bu santral için henüz bakım planı yok.</div>
+
+          {planlar && (
+            <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+              <button
+                type="button"
+                className={planGorunumu === "DEVAM_EDEN" ? "planSekmeAktif" : "planSekme"}
+                onClick={() => setPlanGorunumu("DEVAM_EDEN")}
+              >
+                Devam Eden Bakımlar ({planlar.filter((p) => p.aktif_mi).length})
+              </button>
+              <button
+                type="button"
+                className={planGorunumu === "DURDURULAN" ? "planSekmeAktif" : "planSekme"}
+                onClick={() => setPlanGorunumu("DURDURULAN")}
+              >
+                Durdurulan Bakımlar ({planlar.filter((p) => !p.aktif_mi).length})
+              </button>
+            </div>
           )}
+
+          {planlar && planlar.filter((p) => (planGorunumu === "DEVAM_EDEN" ? p.aktif_mi : !p.aktif_mi)).length === 0 && (
+            <div className="bosDurum">
+              {planGorunumu === "DEVAM_EDEN"
+                ? "Devam eden bir bakım planı yok."
+                : "Durdurulmuş bir bakım planı yok."}
+            </div>
+          )}
+
           {planlar &&
-            planlar.map((p) => (
+            planlar
+              .filter((p) => (planGorunumu === "DEVAM_EDEN" ? p.aktif_mi : !p.aktif_mi))
+              .map((p) => (
               <div className="satirKart" key={p.plan_id}>
                 <div>
                   <strong>{p.ekipman_adi}</strong> — {p.sablon_adi}
