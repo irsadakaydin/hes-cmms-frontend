@@ -19,6 +19,7 @@ const DONEM_ETIKETLERI = {
   HAFTALIK: "Son 7 Gün",
   AYLIK: "Bu Ay",
   YILLIK: "Bu Yıl",
+  OZEL: "Özel Tarih Aralığı…",
 };
 
 function donemTarihAraligi(donem) {
@@ -59,6 +60,8 @@ export default function RaporOlusturSayfasi() {
   const [periyot, setPeriyot] = useState("");
   const [sorumluId, setSorumluId] = useState("");
   const [donem, setDonem] = useState("TUM_ZAMANLAR");
+  const [ozelBaslangic, setOzelBaslangic] = useState("");
+  const [ozelBitis, setOzelBitis] = useState("");
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -79,9 +82,14 @@ export default function RaporOlusturSayfasi() {
 
   async function raporOlustur(format) {
     setHata(null);
+    if (donem === "OZEL" && (!ozelBaslangic || !ozelBitis)) {
+      setHata("Özel tarih aralığı için başlangıç ve bitiş tarihini seçmelisiniz.");
+      return;
+    }
     setIndiriliyor(true);
     try {
-      const { baslangic, bitis } = donemTarihAraligi(donem);
+      const { baslangic, bitis } =
+        donem === "OZEL" ? { baslangic: ozelBaslangic, bitis: ozelBitis } : donemTarihAraligi(donem);
       const parametreler = new URLSearchParams();
       if (santralId) parametreler.set("santral_id", santralId);
       if (periyot) parametreler.set("periyot", periyot);
@@ -163,6 +171,23 @@ export default function RaporOlusturSayfasi() {
                   ))}
                 </select>
               </div>
+
+              {donem === "OZEL" && (
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <div className="alan" style={{ flex: 1 }}>
+                    <label>Başlangıç tarihi</label>
+                    <input
+                      type="date"
+                      value={ozelBaslangic}
+                      onChange={(e) => setOzelBaslangic(e.target.value)}
+                    />
+                  </div>
+                  <div className="alan" style={{ flex: 1 }}>
+                    <label>Bitiş tarihi</label>
+                    <input type="date" value={ozelBitis} onChange={(e) => setOzelBitis(e.target.value)} />
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                 <button className="birincilButon" onClick={() => raporOlustur("pdf")} disabled={indiriliyor}>
