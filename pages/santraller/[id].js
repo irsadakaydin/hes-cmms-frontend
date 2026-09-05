@@ -72,6 +72,7 @@ export default function SantralDetaySayfasi() {
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [raporIndiriliyor, setRaporIndiriliyor] = useState(false);
   const [raporDonemi, setRaporDonemi] = useState("TUM_ZAMANLAR");
+  const [raporPeriyodu, setRaporPeriyodu] = useState("");
 
   const [yeniEkipman, setYeniEkipman] = useState({ ad: "", tip: "", seri_no: "", uretici: "" });
   const [duzenlenenEkipman, setDuzenlenenEkipman] = useState(null);
@@ -223,6 +224,7 @@ export default function SantralDetaySayfasi() {
       const parametreler = new URLSearchParams();
       if (baslangic) parametreler.set("baslangic", baslangic);
       if (bitis) parametreler.set("bitis", bitis);
+      if (raporPeriyodu) parametreler.set("periyot", raporPeriyodu);
       const sorguMetni = parametreler.toString() ? `?${parametreler.toString()}` : "";
 
       await dosyaIndir(
@@ -271,6 +273,18 @@ export default function SantralDetaySayfasi() {
                 style={{ padding: "8px 10px", border: "1px solid var(--line-strong)", background: "var(--paper)", fontSize: "13px" }}
               >
                 {Object.entries(DONEM_ETIKETLERI).map(([deger, etiket]) => (
+                  <option key={deger} value={deger}>
+                    {etiket}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={raporPeriyodu}
+                onChange={(e) => setRaporPeriyodu(e.target.value)}
+                style={{ padding: "8px 10px", border: "1px solid var(--line-strong)", background: "var(--paper)", fontSize: "13px" }}
+              >
+                <option value="">Tüm Bakım Periyotları</option>
+                {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
                   <option key={deger} value={deger}>
                     {etiket}
                   </option>
