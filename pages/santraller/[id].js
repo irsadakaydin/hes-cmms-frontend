@@ -14,6 +14,14 @@ const PERIYOT_ETIKETLERI = {
   YILLIK: "Yıllık",
 };
 
+const ROL_KISA_ETIKET = {
+  ADMIN: "Platform Admin",
+  ISLETME_ADMIN: "İşletme Admin",
+  SANTRAL_SORUMLUSU: "Santral Sorumlusu",
+  SAHA_PERSONELI: "Saha Personeli",
+  IZLEYICI: "İzleyici",
+};
+
 export default function SantralDetaySayfasi() {
   const router = useRouter();
   const { id } = router.query;
@@ -36,7 +44,9 @@ export default function SantralDetaySayfasi() {
     sablon_id: "",
     periyot: "AYLIK",
     baslangic_tarihi: "",
+    sorumlu_kullanici_id: "",
   });
+  const [atanabilirKullanicilar, setAtanabilirKullanicilar] = useState(null);
 
   const verileriYukle = useCallback(async () => {
     if (!id) return;
@@ -47,11 +57,13 @@ export default function SantralDetaySayfasi() {
       // şablonlarını döner — bu, yanlış holdingden şablon seçilmesine yol açardı.)
       const s = await istekAt(`/api/v1/santraller/${id}`);
 
-      const [e, p, sb] = await Promise.all([
+      const [e, p, sb, ak] = await Promise.all([
         istekAt(`/api/v1/santraller/${id}/ekipmanlar`),
         istekAt(`/api/v1/santraller/${id}/bakim-planlari`),
         istekAt(`/api/v1/bakim-sablonlari?isletme_id=${s.isletme_id}`),
+        istekAt(`/api/v1/santraller/${id}/atanabilir-kullanicilar`),
       ]);
+      setAtanabilirKullanicilar(ak.veri);
       setSantral(s);
       setEkipmanlar(e.veri);
       setPlanlar(p.veri);
@@ -132,7 +144,7 @@ export default function SantralDetaySayfasi() {
         method: "POST",
         body: JSON.stringify(yeniPlan),
       });
-      setYeniPlan({ ekipman_id: "", sablon_id: "", periyot: "AYLIK", baslangic_tarihi: "" });
+      setYeniPlan({ ekipman_id: "", sablon_id: "", periyot: "AYLIK", baslangic_tarihi: "", sorumlu_kullanici_id: "" });
       setPlanFormuAcik(false);
       await verileriYukle();
     } catch (err) {
@@ -146,6 +158,20 @@ export default function SantralDetaySayfasi() {
     if (!confirm("Bu bakım planını durdurmak istediğinize emin misiniz? Yeni görev üretilmeyecek.")) return;
     try {
       await istekAt(`/api/v1/bakim-planlari/${planId}/durdur`, { method: "POST" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function planSorumlusunuDegistir(planId, yeniSorumluId) {
+    if (!yeniSorumluId) return;
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/bakim-planlari/${planId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sorumlu_kullanici_id: yeniSorumluId }),
+      });
       await verileriYukle();
     } catch (err) {
       setHata(err.message);
@@ -432,6 +458,28 @@ export default function SantralDetaySayfasi() {
                   onChange={(e) => setYeniPlan({ ...yeniPlan, baslangic_tarihi: e.target.value })}
                 />
               </div>
+              <div className="alan">
+                <label>Sorumlu kullanıcı (görevler kime atansın)</label>
+                <select
+                  required
+                  value={yeniPlan.sorumlu_kullanici_id}
+                  onChange={(e) => setYeniPlan({ ...yeniPlan, sorumlu_kullanici_id: e.target.value })}
+                >
+                  <option value="">Seçin…</option>
+                  {atanabilirKullanicilar &&
+                    atanabilirKullanicilar.map((k) => (
+                      <option key={k.kullanici_id} value={k.kullanici_id}>
+                        {k.ad_soyad} ({ROL_KISA_ETIKET[k.rol] || k.rol})
+                      </option>
+                    ))}
+                </select>
+                {atanabilirKullanicilar && atanabilirKullanicilar.length === 0 && (
+                  <div className="kutuphaneBosUyari">
+                    Bu santrale erişimi olan bir kullanıcı yok — önce Kullanıcılar sayfasından birine bu
+                    santral erişimi verin.
+                  </div>
+                )}
+              </div>
               <button className="birincilButon" type="submit" disabled={gonderiliyor}>
                 {gonderiliyor ? "Ekleniyor…" : "Planı Ekle"}
               </button>
@@ -451,12 +499,33 @@ export default function SantralDetaySayfasi() {
                 <div className="gorevAlt">
                   {PERIYOT_ETIKETLERI[p.periyot] || p.periyot} · Başlangıç:{" "}
                   {new Date(p.baslangic_tarihi).toLocaleDateString("tr-TR")}
+                  {p.sorumlu_ad_soyad && ` · Sorumlu: ${p.sorumlu_ad_soyad}`}
                   {!p.aktif_mi && " · DURDURULDU"}
                 </div>
                 {p.aktif_mi && (
-                  <button className="linkButon" onClick={() => planiDurdur(p.plan_id)}>
-                    Planı durdur
-                  </button>
+                  <>
+                    <select
+                      defaultValue=""
+                      style={{ marginRight: "10px", fontSize: "12px", padding: "4px" }}
+                      onChange={(e) => {
+                        planSorumlusunuDegistir(p.plan_id, e.target.value);
+                        e.target.value = "";
+                      }}
+                    >
+                      <option value="" disabled>
+                        Sorumluyu değiştir…
+                      </option>
+                      {atanabilirKullanicilar &&
+                        atanabilirKullanicilar.map((k) => (
+                          <option key={k.kullanici_id} value={k.kullanici_id}>
+                            {k.ad_soyad}
+                          </option>
+                        ))}
+                    </select>
+                    <button className="linkButon" onClick={() => planiDurdur(p.plan_id)}>
+                      Planı durdur
+                    </button>
+                  </>
                 )}
               </div>
             ))}
