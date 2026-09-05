@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, isletmeYoneticisiMi } from "../lib/api";
+import { istekAt, tokenAl, isletmeYoneticisiMi, kullaniciAl } from "../lib/api";
 import { excelDenSablonCikar } from "../lib/excelSablonImport";
 import UstBar from "../components/UstBar";
 
@@ -20,8 +20,8 @@ const TIP_ETIKETLERI = {
   metin: "Serbest metin",
 };
 
-function bosSablon() {
-  return { ad: "", ekipman_tipi: "", periyot_tipi: "AYLIK", kalemler: [] };
+function bosSablon(varsayilanIsletmeId) {
+  return { ad: "", ekipman_tipi: "", periyot_tipi: "AYLIK", kalemler: [], isletme_id: varsayilanIsletmeId };
 }
 
 function bosKalem(sira) {
@@ -31,23 +31,30 @@ function bosKalem(sira) {
 export default function SablonlarSayfasi() {
   const router = useRouter();
   const dosyaInputRef = useRef(null);
+  const kendiIsletmeId = typeof window !== "undefined" ? kullaniciAl()?.isletme_id : null;
+  const platformAdminMi = typeof window !== "undefined" && kullaniciAl()?.rol === "ADMIN";
 
   const [sablonlar, setSablonlar] = useState(null);
+  const [isletmeler, setIsletmeler] = useState(null);
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
 
   const [formuAcik, setFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
-  const [taslak, setTaslak] = useState(bosSablon());
+  const [taslak, setTaslak] = useState(bosSablon(kendiIsletmeId));
 
   const verileriYukle = useCallback(async () => {
     try {
       const s = await istekAt("/api/v1/bakim-sablonlari");
       setSablonlar(s.veri);
+      if (platformAdminMi) {
+        const i = await istekAt("/api/v1/isletmeler");
+        setIsletmeler(i.veri);
+      }
     } catch (err) {
       setHata(err.message);
     }
-  }, []);
+  }, [platformAdminMi]);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -62,7 +69,7 @@ export default function SablonlarSayfasi() {
   }, [verileriYukle, router]);
 
   function yeniSablonBaslat() {
-    setTaslak(bosSablon());
+    setTaslak(bosSablon(kendiIsletmeId));
     setFormuAcik(true);
     setBilgi(null);
     setHata(null);
@@ -105,6 +112,7 @@ export default function SablonlarSayfasi() {
         ekipman_tipi: sonuc.ekipman_tipi || "",
         periyot_tipi: sonuc.periyot_tipi || "AYLIK",
         kalemler: sonuc.kalemler.map((k) => ({ ...k, birim: "", zorunlu: true })),
+        isletme_id: taslak.isletme_id || kendiIsletmeId,
       });
       setFormuAcik(true);
     } catch (err) {
@@ -138,6 +146,7 @@ export default function SablonlarSayfasi() {
           ekipman_tipi: taslak.ekipman_tipi,
           periyot_tipi: taslak.periyot_tipi,
           checklist_json: { kalemler: taslak.kalemler },
+          isletme_id: taslak.isletme_id,
         }),
       });
       setBilgi("Bakım şablonu kaydedildi.");
@@ -182,6 +191,21 @@ export default function SablonlarSayfasi() {
 
           {formuAcik && (
             <form onSubmit={sablonuKaydet} className="yonetimFormu">
+              {platformAdminMi && isletmeler && (
+                <div className="alan">
+                  <label>Holding</label>
+                  <select
+                    value={taslak.isletme_id || ""}
+                    onChange={(e) => setTaslak({ ...taslak, isletme_id: e.target.value })}
+                  >
+                    {isletmeler.map((i) => (
+                      <option key={i.isletme_id} value={i.isletme_id}>
+                        {i.ad}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="alan">
                 <label>Şablon adı</label>
                 <input
@@ -268,6 +292,7 @@ export default function SablonlarSayfasi() {
               <div className="satirKart" key={s.sablon_id}>
                 <div>
                   <strong>{s.ad}</strong>
+                  {platformAdminMi && <span className="gorevAlt"> — {s.isletme_adi}</span>}
                 </div>
                 <div className="gorevAlt">
                   {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi} · v{s.versiyon}
