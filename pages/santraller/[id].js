@@ -222,6 +222,27 @@ export default function SantralDetaySayfasi() {
     }
   }
 
+  async function planiAktiflestir(planId) {
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/bakim-planlari/${planId}/aktiflestir`, { method: "POST" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function planiSil(planId) {
+    if (!confirm("Bu bakım planını kalıcı olarak silmek istediğinize emin misiniz?")) return;
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/bakim-planlari/${planId}`, { method: "DELETE" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   async function planSorumlusunuDegistir(planId, yeniSorumluId) {
     if (!yeniSorumluId) return;
     setHata(null);
@@ -657,6 +678,14 @@ export default function SantralDetaySayfasi() {
                     </button>
                   </>
                 )}
+                {!p.aktif_mi && (
+                  <button className="linkButon" onClick={() => planiAktiflestir(p.plan_id)}>
+                    Yeniden aktifleştir
+                  </button>
+                )}
+                <button className="linkButon" onClick={() => planiSil(p.plan_id)}>
+                  Sil
+                </button>
               </div>
             ))}
         </div>
