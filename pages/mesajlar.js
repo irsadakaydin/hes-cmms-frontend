@@ -17,6 +17,8 @@ function tarihSaatFormatla(deger) {
 
 export default function MesajlarSayfasi() {
   const router = useRouter();
+  const yonetici = typeof window !== "undefined" ? yoneticiMi() : false;
+
   const [sekme, setSekme] = useState("GELEN");
   const [alicilar, setAlicilar] = useState(null);
   const [gelenler, setGelenler] = useState(null);
@@ -25,6 +27,8 @@ export default function MesajlarSayfasi() {
   const [bilgi, setBilgi] = useState(null);
 
   const [formuAcik, setFormuAcik] = useState(false);
+  const [yanitVerilenId, setYanitVerilenId] = useState(null); // sadece yönetici olmayanlar icin
+  const [yanitVerilenAd, setYanitVerilenAd] = useState("");
   const [seciliAlicilar, setSeciliAlicilar] = useState([]);
   const [mesajIcerigi, setMesajIcerigi] = useState("");
   const [gonderiliyor, setGonderiliyor] = useState(false);
@@ -33,26 +37,20 @@ export default function MesajlarSayfasi() {
 
   const verileriYukle = useCallback(async () => {
     try {
-      const [a, g, gi] = await Promise.all([
-        istekAt("/api/v1/mesajlar/alicilar"),
-        istekAt("/api/v1/mesajlar/gelen-kutusu"),
-        istekAt("/api/v1/mesajlar/giden-kutusu"),
-      ]);
-      setAlicilar(a.veri);
-      setGelenler(g.veri);
-      setGidenler(gi.veri);
+      const istekler = [istekAt("/api/v1/mesajlar/gelen-kutusu"), istekAt("/api/v1/mesajlar/giden-kutusu")];
+      if (yonetici) istekler.push(istekAt("/api/v1/mesajlar/alicilar"));
+      const sonuclar = await Promise.all(istekler);
+      setGelenler(sonuclar[0].veri);
+      setGidenler(sonuclar[1].veri);
+      if (sonuclar[2]) setAlicilar(sonuclar[2].veri);
     } catch (err) {
       setHata(err.message);
     }
-  }, []);
+  }, [yonetici]);
 
   useEffect(() => {
     if (!tokenAl()) {
       router.replace("/");
-      return;
-    }
-    if (!yoneticiMi()) {
-      router.replace("/gorevler");
       return;
     }
     verileriYukle();
@@ -72,7 +70,17 @@ export default function MesajlarSayfasi() {
     setSeciliAlicilar([]);
   }
 
-  function yanitla(gonderenId) {
+  function yeniMesajBaslat() {
+    setYanitVerilenId(null);
+    setYanitVerilenAd("");
+    setSeciliAlicilar([]);
+    setMesajIcerigi("");
+    setFormuAcik((v) => !v);
+  }
+
+  function yanitla(gonderenId, gonderenAdi) {
+    setYanitVerilenId(gonderenId);
+    setYanitVerilenAd(gonderenAdi);
     setSeciliAlicilar([gonderenId]);
     setMesajIcerigi("");
     setFormuAcik(true);
@@ -124,6 +132,21 @@ export default function MesajlarSayfasi() {
     }
   }
 
+  async function mesajSil(mesajId, hangiKutu) {
+    if (!confirm("Bu mesajı kalıcı olarak silmek istediğinize emin misiniz?")) return;
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/mesajlar/${mesajId}`, { method: "DELETE" });
+      if (hangiKutu === "GELEN") {
+        setGelenler((onceki) => onceki.filter((m) => m.mesaj_id !== mesajId));
+      } else {
+        setGidenler((onceki) => onceki.filter((m) => m.mesaj_id !== mesajId));
+      }
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -134,9 +157,11 @@ export default function MesajlarSayfasi() {
         <div className="icerik">
           <div className="bolumBaslik">
             <h2>Mesajlar</h2>
-            <button className="kucukButon" onClick={() => setFormuAcik((v) => !v)}>
-              {formuAcik ? "Vazgeç" : "+ Yeni Mesaj"}
-            </button>
+            {yonetici && (
+              <button className="kucukButon" onClick={yeniMesajBaslat}>
+                {formuAcik && !yanitVerilenId ? "Vazgeç" : "+ Yeni Mesaj"}
+              </button>
+            )}
           </div>
 
           {hata && <div className="hataKutusu">{hata}</div>}
@@ -144,37 +169,40 @@ export default function MesajlarSayfasi() {
 
           {formuAcik && (
             <form onSubmit={mesajGonder} className="yonetimFormu">
-              <div className="alan">
-                <label>Alıcılar</label>
-                <div style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
-                  <button type="button" className="linkButon" onClick={hepsiniSec}>
-                    Hepsini seç
-                  </button>
-                  <button type="button" className="linkButon" onClick={secimiTemizle}>
-                    Seçimi temizle
-                  </button>
+              {yanitVerilenId ? (
+                <div className="alan">
+                  <label>Kime</label>
+                  <div style={{ fontSize: "14px" }}>{yanitVerilenAd}</div>
                 </div>
-                <div className="aliciListesi">
-                  {alicilar &&
-                    alicilar.map((k) => (
-                      <label key={k.kullanici_id} className="aliciSatiri">
-                        <input
-                          type="checkbox"
-                          checked={seciliAlicilar.includes(k.kullanici_id)}
-                          onChange={() => aliciSecimiDegistir(k.kullanici_id)}
-                        />
-                        {k.ad_soyad} <span className="gorevAlt">({k.rol})</span>
-                      </label>
-                    ))}
+              ) : (
+                <div className="alan">
+                  <label>Alıcılar</label>
+                  <div style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
+                    <button type="button" className="linkButon" onClick={hepsiniSec}>
+                      Hepsini seç
+                    </button>
+                    <button type="button" className="linkButon" onClick={secimiTemizle}>
+                      Seçimi temizle
+                    </button>
+                  </div>
+                  <div className="aliciListesi">
+                    {alicilar &&
+                      alicilar.map((k) => (
+                        <label key={k.kullanici_id} className="aliciSatiri">
+                          <input
+                            type="checkbox"
+                            checked={seciliAlicilar.includes(k.kullanici_id)}
+                            onChange={() => aliciSecimiDegistir(k.kullanici_id)}
+                          />
+                          {k.ad_soyad} <span className="gorevAlt">({k.rol})</span>
+                        </label>
+                      ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="alan">
                 <label>Mesaj</label>
-                <textarea
-                  required
-                  value={mesajIcerigi}
-                  onChange={(e) => setMesajIcerigi(e.target.value)}
-                />
+                <textarea required value={mesajIcerigi} onChange={(e) => setMesajIcerigi(e.target.value)} />
               </div>
               <button className="birincilButon" type="submit" disabled={gonderiliyor}>
                 {gonderiliyor ? "Gönderiliyor…" : `Gönder (${seciliAlicilar.length} kişiye)`}
@@ -218,15 +246,28 @@ export default function MesajlarSayfasi() {
                       {m.icerik}
                     </div>
                     {acikMesajId === m.mesaj_id && (
-                      <button
-                        className="linkButon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          yanitla(m.gonderen_id);
-                        }}
-                      >
-                        Yanıtla
-                      </button>
+                      <div style={{ display: "flex", gap: "14px" }}>
+                        <button
+                          className="linkButon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            yanitla(m.gonderen_id, m.gonderen_adi);
+                          }}
+                        >
+                          Yanıtla
+                        </button>
+                        {yonetici && (
+                          <button
+                            className="linkButon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              mesajSil(m.mesaj_id, "GELEN");
+                            }}
+                          >
+                            Sil
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -248,6 +289,11 @@ export default function MesajlarSayfasi() {
                     <div className={`okunduCizgisi ${m.okundu_mu ? "okunduYesil" : "okunduKirmizi"}`}>
                       {m.okundu_mu ? `✓ Okundu — ${tarihSaatFormatla(m.okunma_tarihi)}` : "Henüz okunmadı"}
                     </div>
+                    {yonetici && (
+                      <button className="linkButon" onClick={() => mesajSil(m.mesaj_id, "GIDEN")}>
+                        Sil
+                      </button>
+                    )}
                   </div>
                 ))}
             </>

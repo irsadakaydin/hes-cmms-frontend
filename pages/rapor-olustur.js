@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, yoneticiMi, dosyaIndir } from "../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi, dosyaIndir } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -50,7 +50,10 @@ function donemTarihAraligi(donem) {
 
 export default function RaporOlusturSayfasi() {
   const router = useRouter();
+  const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
   const [santraller, setSantraller] = useState(null);
+  const [holdingler, setHoldingler] = useState(null);
+  const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [personel, setPersonel] = useState(null);
   const [hata, setHata] = useState(null);
   const [indiriliyor, setIndiriliyor] = useState(false);
@@ -72,13 +75,23 @@ export default function RaporOlusturSayfasi() {
       router.replace("/gorevler");
       return;
     }
-    istekAt("/api/v1/raporlar/filtre-secenekleri")
-      .then((veri) => {
+    const istekler = [istekAt("/api/v1/raporlar/filtre-secenekleri")];
+    if (platformAdminMi()) istekler.push(istekAt("/api/v1/isletmeler"));
+    Promise.all(istekler)
+      .then(([veri, h]) => {
         setSantraller(veri.santraller);
         setPersonel(veri.personel);
+        if (h) setHoldingler(h.veri);
       })
       .catch((err) => setHata(err.message));
   }, [router]);
+
+  const gosterilecekSantraller = platformAdmin
+    ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
+    : santraller;
+  const gosterilecekPersonel = platformAdmin
+    ? (personel || []).filter((p) => p.isletme_id === seciliHoldingId)
+    : personel;
 
   async function raporOlustur(format) {
     setHata(null);
@@ -101,7 +114,7 @@ export default function RaporOlusturSayfasi() {
       const uzanti = format === "pdf" ? "pdf" : "xlsx";
 
       const santralAdi = santralId
-        ? santraller.find((s) => s.santral_id === santralId)?.ad || "Santral"
+        ? gosterilecekSantraller.find((s) => s.santral_id === santralId)?.ad || "Santral"
         : "Tüm Santraller";
       const periyotAdi = periyot ? PERIYOT_ETIKETLERI[periyot] || periyot : "Tüm Periyotlar";
       const dosyaAdi = `${santralAdi} (${periyotAdi}) Bakım Raporu.${uzanti}`;
@@ -131,79 +144,105 @@ export default function RaporOlusturSayfasi() {
 
           {santraller && (
             <div className="yonetimFormu">
-              <div className="alan">
-                <label>Santral</label>
-                <select value={santralId} onChange={(e) => setSantralId(e.target.value)}>
-                  <option value="">Tüm Santraller</option>
-                  {santraller.map((s) => (
-                    <option key={s.santral_id} value={s.santral_id}>
-                      {s.ad} {s.isletme_adi ? `(${s.isletme_adi})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="alan">
-                <label>Bakım Periyodu</label>
-                <select value={periyot} onChange={(e) => setPeriyot(e.target.value)}>
-                  <option value="">Tüm Periyotlar</option>
-                  {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
-                    <option key={deger} value={deger}>
-                      {etiket}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="alan">
-                <label>Bakım Sorumlusu</label>
-                <select value={sorumluId} onChange={(e) => setSorumluId(e.target.value)}>
-                  <option value="">Tüm Personel</option>
-                  {personel &&
-                    personel.map((p) => (
-                      <option key={p.kullanici_id} value={p.kullanici_id}>
-                        {p.ad_soyad}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div className="alan">
-                <label>Rapor Aralığı</label>
-                <select value={donem} onChange={(e) => setDonem(e.target.value)}>
-                  {Object.entries(DONEM_ETIKETLERI).map(([deger, etiket]) => (
-                    <option key={deger} value={deger}>
-                      {etiket}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {donem === "OZEL" && (
-                <div style={{ display: "flex", gap: "12px" }}>
-                  <div className="alan" style={{ flex: 1 }}>
-                    <label>Başlangıç tarihi</label>
-                    <input
-                      type="date"
-                      value={ozelBaslangic}
-                      onChange={(e) => setOzelBaslangic(e.target.value)}
-                    />
-                  </div>
-                  <div className="alan" style={{ flex: 1 }}>
-                    <label>Bitiş tarihi</label>
-                    <input type="date" value={ozelBitis} onChange={(e) => setOzelBitis(e.target.value)} />
-                  </div>
+              {platformAdmin && (
+                <div className="alan">
+                  <label>Holding</label>
+                  <select
+                    value={seciliHoldingId}
+                    onChange={(e) => {
+                      setSeciliHoldingId(e.target.value);
+                      setSantralId("");
+                      setSorumluId("");
+                    }}
+                  >
+                    <option value="">Bir holding seçin…</option>
+                    {holdingler &&
+                      holdingler.map((h) => (
+                        <option key={h.isletme_id} value={h.isletme_id}>
+                          {h.ad}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                <button className="birincilButon" onClick={() => raporOlustur("pdf")} disabled={indiriliyor}>
-                  {indiriliyor ? "Hazırlanıyor…" : "PDF Rapor Oluştur"}
-                </button>
-                <button className="birincilButon" onClick={() => raporOlustur("excel")} disabled={indiriliyor}>
-                  {indiriliyor ? "Hazırlanıyor…" : "Excel Rapor Oluştur"}
-                </button>
-              </div>
+              {(!platformAdmin || seciliHoldingId) && (
+                <>
+                  <div className="alan">
+                    <label>Santral</label>
+                    <select value={santralId} onChange={(e) => setSantralId(e.target.value)}>
+                      <option value="">Tüm Santraller</option>
+                      {gosterilecekSantraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad} {!platformAdmin && s.isletme_adi ? `(${s.isletme_adi})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="alan">
+                    <label>Bakım Periyodu</label>
+                    <select value={periyot} onChange={(e) => setPeriyot(e.target.value)}>
+                      <option value="">Tüm Periyotlar</option>
+                      {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
+                        <option key={deger} value={deger}>
+                          {etiket}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="alan">
+                    <label>Bakım Sorumlusu</label>
+                    <select value={sorumluId} onChange={(e) => setSorumluId(e.target.value)}>
+                      <option value="">Tüm Personel</option>
+                      {gosterilecekPersonel &&
+                        gosterilecekPersonel.map((p) => (
+                          <option key={p.kullanici_id} value={p.kullanici_id}>
+                            {p.ad_soyad}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="alan">
+                    <label>Rapor Aralığı</label>
+                    <select value={donem} onChange={(e) => setDonem(e.target.value)}>
+                      {Object.entries(DONEM_ETIKETLERI).map(([deger, etiket]) => (
+                        <option key={deger} value={deger}>
+                          {etiket}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {donem === "OZEL" && (
+                    <div style={{ display: "flex", gap: "12px" }}>
+                      <div className="alan" style={{ flex: 1 }}>
+                        <label>Başlangıç tarihi</label>
+                        <input
+                          type="date"
+                          value={ozelBaslangic}
+                          onChange={(e) => setOzelBaslangic(e.target.value)}
+                        />
+                      </div>
+                      <div className="alan" style={{ flex: 1 }}>
+                        <label>Bitiş tarihi</label>
+                        <input type="date" value={ozelBitis} onChange={(e) => setOzelBitis(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                    <button className="birincilButon" onClick={() => raporOlustur("pdf")} disabled={indiriliyor}>
+                      {indiriliyor ? "Hazırlanıyor…" : "PDF Rapor Oluştur"}
+                    </button>
+                    <button className="birincilButon" onClick={() => raporOlustur("excel")} disabled={indiriliyor}>
+                      {indiriliyor ? "Hazırlanıyor…" : "Excel Rapor Oluştur"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

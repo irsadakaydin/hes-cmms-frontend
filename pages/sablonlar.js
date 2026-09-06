@@ -36,6 +36,8 @@ export default function SablonlarSayfasi() {
 
   const [sablonlar, setSablonlar] = useState(null);
   const [isletmeler, setIsletmeler] = useState(null);
+  const [seciliHoldingId, setSeciliHoldingId] = useState(kendiIsletmeId || "");
+  const [digerHoldingSablonlari, setDigerHoldingSablonlari] = useState(null);
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
 
@@ -46,16 +48,23 @@ export default function SablonlarSayfasi() {
 
   const verileriYukle = useCallback(async () => {
     try {
-      const s = await istekAt("/api/v1/bakim-sablonlari?hepsi=1");
-      setSablonlar(s.veri);
-      if (platformAdminMi) {
-        const i = await istekAt("/api/v1/isletmeler");
-        setIsletmeler(i.veri);
+      const istekler = [istekAt("/api/v1/bakim-sablonlari/diger-holdingler")];
+      if (platformAdminMi) istekler.push(istekAt("/api/v1/isletmeler"));
+      const sonuclar = await Promise.all(istekler);
+      setDigerHoldingSablonlari(sonuclar[0].veri);
+      if (sonuclar[1]) setIsletmeler(sonuclar[1].veri);
+
+      if (!platformAdminMi || seciliHoldingId) {
+        const hedefId = platformAdminMi ? seciliHoldingId : kendiIsletmeId;
+        const s = await istekAt(`/api/v1/bakim-sablonlari?hepsi=1&isletme_id=${hedefId}`);
+        setSablonlar(s.veri);
+      } else {
+        setSablonlar(null);
       }
     } catch (err) {
       setHata(err.message);
     }
-  }, [platformAdminMi]);
+  }, [platformAdminMi, seciliHoldingId, kendiIsletmeId]);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -70,7 +79,7 @@ export default function SablonlarSayfasi() {
   }, [verileriYukle, router]);
 
   function yeniSablonBaslat() {
-    setTaslak(bosSablon(kendiIsletmeId));
+    setTaslak(bosSablon(platformAdminMi ? seciliHoldingId : kendiIsletmeId));
     setDuzenlenenSablonId(null);
     setFormuAcik(true);
     setBilgi(null);
@@ -133,7 +142,7 @@ export default function SablonlarSayfasi() {
         ekipman_tipi: sonuc.ekipman_tipi || "",
         periyot_tipi: sonuc.periyot_tipi || "AYLIK",
         kalemler: sonuc.kalemler.map((k) => ({ ...k, birim: "", zorunlu: true })),
-        isletme_id: taslak.isletme_id || kendiIsletmeId,
+        isletme_id: taslak.isletme_id || (platformAdminMi ? seciliHoldingId : kendiIsletmeId),
       });
       setFormuAcik(true);
     } catch (err) {
@@ -218,6 +227,22 @@ export default function SablonlarSayfasi() {
     }
   }
 
+  async function sablonKopyala(sablon) {
+    setHata(null);
+    setBilgi(null);
+    try {
+      const gonderilecek = platformAdminMi ? { hedef_isletme_id: seciliHoldingId } : {};
+      await istekAt(`/api/v1/bakim-sablonlari/${sablon.sablon_id}/kopyala`, {
+        method: "POST",
+        body: JSON.stringify(gonderilecek),
+      });
+      setBilgi(`"${sablon.ad}" holdinginize kopyalandı.`);
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -228,14 +253,16 @@ export default function SablonlarSayfasi() {
         <div className="icerik">
           <div className="bolumBaslik">
             <h2>Bakım Şablonları</h2>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button className="kucukButon" onClick={() => dosyaInputRef.current.click()}>
-                Excel'den İçe Aktar
-              </button>
-              <button className="kucukButon" onClick={yeniSablonBaslat}>
-                + Elle Oluştur
-              </button>
-            </div>
+            {(!platformAdminMi || seciliHoldingId) && (
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button className="kucukButon" onClick={() => dosyaInputRef.current.click()}>
+                  Excel'den İçe Aktar
+                </button>
+                <button className="kucukButon" onClick={yeniSablonBaslat}>
+                  + Elle Oluştur
+                </button>
+              </div>
+            )}
             <input
               ref={dosyaInputRef}
               type="file"
@@ -247,6 +274,21 @@ export default function SablonlarSayfasi() {
 
           {hata && <div className="hataKutusu">{hata}</div>}
           {bilgi && <div className="basariliKutu">{bilgi}</div>}
+
+          {platformAdminMi && (
+            <div className="alan" style={{ maxWidth: "340px" }}>
+              <label>Holding</label>
+              <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
+                <option value="">Bir holding seçin…</option>
+                {isletmeler &&
+                  isletmeler.map((h) => (
+                    <option key={h.isletme_id} value={h.isletme_id}>
+                      {h.ad}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           {formuAcik && (
             <form onSubmit={sablonuKaydet} className="yonetimFormu">
@@ -357,38 +399,70 @@ export default function SablonlarSayfasi() {
             </form>
           )}
 
-          {!sablonlar && !formuAcik && <div className="yukleniyor">Yükleniyor…</div>}
-          {sablonlar && sablonlar.length === 0 && !formuAcik && (
-            <div className="bosDurum">Henüz bir bakım şablonu eklenmemiş.</div>
+          {platformAdminMi && !seciliHoldingId && !formuAcik && (
+            <div className="bosDurum">Şablonları görmek için yukarıdan bir holding seçin.</div>
           )}
-          {sablonlar &&
-            sablonlar.map((s) => (
-              <div className="satirKart" key={s.sablon_id}>
-                <div>
-                  <strong>{s.ad}</strong>
-                  {platformAdminMi && <span className="gorevAlt"> — {s.isletme_adi}</span>}
-                  {!s.aktif_mi && (
-                    <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
-                      Pasif
-                    </span>
-                  )}
-                </div>
-                <div className="gorevAlt">
-                  {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi} · v{s.versiyon}
-                </div>
-                <div className="kullaniciAlt">
-                  <button className="linkButon" onClick={() => duzenlemeyiBaslat(s)}>
-                    Düzenle
-                  </button>
-                  <button className="linkButon" onClick={() => sablonDurumDegistir(s)}>
-                    {s.aktif_mi ? "Pasifleştir" : "Yeniden aktifleştir"}
-                  </button>
-                  <button className="linkButon" onClick={() => sablonSil(s)}>
-                    Sil
-                  </button>
-                </div>
-              </div>
-            ))}
+
+          {(!platformAdminMi || seciliHoldingId) && (
+            <>
+              {!sablonlar && !formuAcik && <div className="yukleniyor">Yükleniyor…</div>}
+              {sablonlar && sablonlar.length === 0 && !formuAcik && (
+                <div className="bosDurum">Bu holdingde henüz bir bakım şablonu eklenmemiş.</div>
+              )}
+              {sablonlar &&
+                sablonlar.map((s) => (
+                  <div className="satirKart" key={s.sablon_id}>
+                    <div>
+                      <strong>{s.ad}</strong>
+                      {!s.aktif_mi && (
+                        <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
+                          Pasif
+                        </span>
+                      )}
+                    </div>
+                    <div className="gorevAlt">
+                      {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi} · v{s.versiyon}
+                    </div>
+                    <div className="kullaniciAlt">
+                      <button className="linkButon" onClick={() => duzenlemeyiBaslat(s)}>
+                        Düzenle
+                      </button>
+                      <button className="linkButon" onClick={() => sablonDurumDegistir(s)}>
+                        {s.aktif_mi ? "Pasifleştir" : "Yeniden aktifleştir"}
+                      </button>
+                      <button className="linkButon" onClick={() => sablonSil(s)}>
+                        Sil
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+              {digerHoldingSablonlari &&
+                digerHoldingSablonlari.filter((s) => s.isletme_id !== seciliHoldingId).length > 0 && (
+                  <div style={{ marginTop: "28px" }}>
+                    <h3 className="holdingBasligi">Diğer Holdinglerden Kopyala</h3>
+                    {digerHoldingSablonlari
+                      .filter((s) => s.isletme_id !== seciliHoldingId)
+                      .map((s) => (
+                        <div className="satirKart" key={s.sablon_id}>
+                          <div>
+                            <strong>{s.ad}</strong>
+                            <span className="gorevAlt"> — {s.isletme_adi}</span>
+                          </div>
+                          <div className="gorevAlt">
+                            {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
+                          </div>
+                          <div className="kullaniciAlt">
+                            <button className="linkButon" onClick={() => sablonKopyala(s)}>
+                              Kendi holdingime kopyala
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+            </>
+          )}
         </div>
       </div>
     </>
