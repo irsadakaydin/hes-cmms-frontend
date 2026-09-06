@@ -678,6 +678,16 @@ export default function SantralDetaySayfasi() {
                   {PERIYOT_ETIKETLERI[p.periyot] || p.periyot} · Başlangıç:{" "}
                   {new Date(p.baslangic_tarihi).toLocaleDateString("tr-TR")}
                   {!p.aktif_mi && " · DURDURULDU"}
+                  {p.son_donem_toplam > 1 && (
+                    <span
+                      className={`rozet ${
+                        p.son_donem_tamamlanan === p.son_donem_toplam ? "rozet-TAMAMLANDI" : "rozet-GECIKTI"
+                      }`}
+                      style={{ marginLeft: 8 }}
+                    >
+                      {p.son_donem_tamamlanan}/{p.son_donem_toplam} kişi onayladı
+                    </span>
+                  )}
                 </div>
                 {p.sorumlular && p.sorumlular.length > 0 && (
                   <div className="santralEtiketleri" style={{ marginTop: "6px" }}>
