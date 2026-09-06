@@ -205,6 +205,30 @@ h1, h2, h3 {
   background: var(--surface);
 }
 
+.alan textarea,
+.alan select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 15px;
+  font-family: var(--font-body);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.alan textarea {
+  resize: none;
+  height: 110px;
+}
+
+.alan textarea:focus,
+.alan select:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  background: var(--surface);
+}
+
 .birincilButon {
   width: 100%;
   background: var(--teal);
@@ -453,15 +477,16 @@ h1, h2, h3 {
   color: var(--ink-soft);
 }
 
-.kalemSoru textarea {
+.kalem textarea {
   width: 100%;
-  min-height: 60px;
+  height: 90px;
   padding: 8px 10px;
   border: 1px solid var(--line-strong);
   background: var(--paper);
   font-family: var(--font-body);
   font-size: 14px;
-  resize: vertical;
+  resize: none;
+  box-sizing: border-box;
 }
 
 .tamamlaButon {
@@ -584,6 +609,20 @@ h1, h2, h3 {
   cursor: pointer;
 }
 
+.fotograflarSekmesi {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
 .fotografEkleButon:hover:not(:disabled) {
   border-color: var(--teal);
   background: var(--amber-soft);
@@ -677,6 +716,11 @@ h1, h2, h3 {
   font-size: 13px;
   padding: 4px 0;
   cursor: pointer;
+}
+
+.aliciSatiri input[type="checkbox"] {
+  flex-shrink: 0;
+  margin: 0;
 }
 
 .mesajKarti {
