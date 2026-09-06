@@ -244,6 +244,21 @@ export default function SantralDetaySayfasi() {
       await istekAt(`/api/v1/bakim-planlari/${planId}`, { method: "DELETE" });
       await verileriYukle();
     } catch (err) {
+      if (err.hata_kodu === "PLAN_GECMISI_VAR" && isletmeYoneticisiMi()) {
+        if (
+          confirm(
+            `${err.message}\n\nBunun yerine görev geçmişiyle BİRLİKTE kalıcı olarak silmek ister misiniz? Bu işlem GERİ ALINAMAZ.`
+          )
+        ) {
+          try {
+            await istekAt(`/api/v1/bakim-planlari/${planId}?zorla=1`, { method: "DELETE" });
+            await verileriYukle();
+          } catch (err2) {
+            setHata(err2.message);
+          }
+          return;
+        }
+      }
       setHata(err.message);
     }
   }
