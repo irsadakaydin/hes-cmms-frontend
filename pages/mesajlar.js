@@ -174,7 +174,6 @@ export default function MesajlarSayfasi() {
                   required
                   value={mesajIcerigi}
                   onChange={(e) => setMesajIcerigi(e.target.value)}
-                  style={{ minHeight: "90px" }}
                 />
               </div>
               <button className="birincilButon" type="submit" disabled={gonderiliyor}>
