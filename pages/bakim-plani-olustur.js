@@ -70,7 +70,7 @@ export default function BakimPlaniOlusturSayfasi() {
         const santral = santraller.find((s) => s.santral_id === santral_id);
         const [e, sb, ak] = await Promise.all([
           istekAt(`/api/v1/santraller/${santral_id}/ekipmanlar`),
-          istekAt(`/api/v1/bakim-sablonlari?isletme_id=${santral.isletme_id}`),
+          istekAt(`/api/v1/bakim-sablonlari?isletme_id=${santral.isletme_id}&santral_id=${santral_id}`),
           istekAt(`/api/v1/santraller/${santral_id}/atanabilir-kullanicilar`),
         ]);
         setEkipmanlar(e.veri);
