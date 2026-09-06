@@ -31,9 +31,12 @@ export default function GirisLoglariSayfasi() {
   const [holdingler, setHoldingler] = useState(null);
   const [santraller, setSantraller] = useState(null);
   const [kayitlar, setKayitlar] = useState(null);
+  const [kayitlarAcik, setKayitlarAcik] = useState(false);
   const [hata, setHata] = useState(null);
   const [indiriliyor, setIndiriliyor] = useState(false);
 
+  // Son seçilen holding/santral, tarayıcıda hatırlanır — sayfaya her
+  // girişte "Tüm Holdingler"den başlamak yerine kaldığınız yerden devam edin.
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [seciliSantralIdleri, setSeciliSantralIdleri] = useState([]);
   const [santralPaneliAcik, setSantralPaneliAcik] = useState(false);
@@ -49,6 +52,16 @@ export default function GirisLoglariSayfasi() {
     if (!isletmeYoneticisiMi()) {
       router.replace("/gorevler");
       return;
+    }
+    try {
+      const kayitliHolding = localStorage.getItem("girisLoglariHoldingId");
+      const kayitliSantraller = JSON.parse(localStorage.getItem("girisLoglariSantralIdleri") || "[]");
+      if (kayitliHolding) setSeciliHoldingId(kayitliHolding);
+      if (Array.isArray(kayitliSantraller) && kayitliSantraller.length > 0) {
+        setSeciliSantralIdleri(kayitliSantraller);
+      }
+    } catch {
+      // localStorage okunamazsa sessizce geç, varsayılan (boş) filtrelerle devam et
     }
     istekAt("/api/v1/giris-loglari/filtre-secenekleri")
       .then((veri) => {
@@ -86,6 +99,7 @@ export default function GirisLoglariSayfasi() {
     if (seciliKisiId) p.set("kullanici_id", seciliKisiId);
     if (baslangic) p.set("baslangic", baslangic);
     if (bitis) p.set("bitis", bitis);
+    p.set("limit", "50");
     return p;
   }, [platformAdmin, seciliHoldingId, seciliSantralIdleri, seciliKisiId, baslangic, bitis]);
 
@@ -104,16 +118,22 @@ export default function GirisLoglariSayfasi() {
   }, [kayitlariGetir]);
 
   function santralSecimiDegistir(santralId) {
-    setSeciliSantralIdleri((onceki) =>
-      onceki.includes(santralId) ? onceki.filter((id) => id !== santralId) : [...onceki, santralId]
-    );
+    setSeciliSantralIdleri((onceki) => {
+      const yeni = onceki.includes(santralId) ? onceki.filter((id) => id !== santralId) : [...onceki, santralId];
+      localStorage.setItem("girisLoglariSantralIdleri", JSON.stringify(yeni));
+      return yeni;
+    });
   }
 
   async function pdfIndir() {
     setIndiriliyor(true);
     setHata(null);
     try {
-      await dosyaIndir(`/api/v1/giris-loglari/pdf?${parametreOlustur().toString()}`, "giris-loglari.pdf");
+      // PDF raporu ekrandaki "son 50" sınırına takılmasın — tüm filtrelenmiş
+      // kayıtları içersin diye limit parametresini kaldırıyoruz.
+      const p = parametreOlustur();
+      p.delete("limit");
+      await dosyaIndir(`/api/v1/giris-loglari/pdf?${p.toString()}`, "giris-loglari.pdf");
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -152,6 +172,8 @@ export default function GirisLoglariSayfasi() {
                     setSeciliHoldingId(e.target.value);
                     setSeciliSantralIdleri([]);
                     setSantralPaneliAcik(false);
+                    localStorage.setItem("girisLoglariHoldingId", e.target.value);
+                    localStorage.setItem("girisLoglariSantralIdleri", "[]");
                   }}
                 >
                   <option value="">Tüm Holdingler</option>
@@ -221,10 +243,19 @@ export default function GirisLoglariSayfasi() {
           </div>
 
           {!kayitlar && <div className="yukleniyor">Yükleniyor…</div>}
-          {kayitlar && kayitlar.length === 0 && (
+
+          {kayitlar && (
+            <button type="button" className="periyotGrupBasligi" onClick={() => setKayitlarAcik((v) => !v)}>
+              {kayitlarAcik ? "▾" : "▸"} Giriş Kayıtları ({kayitlar.length}
+              {kayitlar.length === 50 ? " — son 50" : ""})
+            </button>
+          )}
+
+          {kayitlar && kayitlarAcik && kayitlar.length === 0 && (
             <div className="bosDurum">Seçilen filtrelerle eşleşen giriş kaydı yok.</div>
           )}
           {kayitlar &&
+            kayitlarAcik &&
             kayitlar.map((k) => (
               <div className="satirKart" key={k.kayit_id}>
                 <div>
