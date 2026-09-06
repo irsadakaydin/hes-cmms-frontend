@@ -12,8 +12,15 @@ const PERIYOT_ETIKETLERI = {
   UC_AYLIK: "3 Ayda Bir",
   ALTI_AYLIK: "6 Ayda Bir",
   YILLIK: "Yıllık",
+  IKI_YILLIK: "2 Yılda Bir",
+  UC_YILLIK: "3 Yılda Bir",
+  BES_YILLIK: "5 Yılda Bir",
+  ON_YILLIK: "10 Yılda Bir",
 };
-const PERIYOT_SIRASI = ["GUNLUK", "HAFTALIK", "AYLIK", "UC_AYLIK", "ALTI_AYLIK", "YILLIK"];
+const PERIYOT_SIRASI = [
+  "GUNLUK", "HAFTALIK", "AYLIK", "UC_AYLIK", "ALTI_AYLIK", "YILLIK",
+  "IKI_YILLIK", "UC_YILLIK", "BES_YILLIK", "ON_YILLIK",
+];
 
 const TIP_ETIKETLERI = {
   evet_hayir: "Evet / Hayır",
