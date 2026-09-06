@@ -4,6 +4,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../../lib/api";
 import UstBar from "../../components/UstBar";
+import OzetBanner from "../../components/OzetBanner";
 
 function bosForm() {
   return { isletme_id: "", ad: "", konum: "", kurulu_guc_mw: "", turbin_tipi: "" };
@@ -80,6 +81,7 @@ export default function SantrallerSayfasi() {
       </Head>
       <div className="sayfa">
         <UstBar />
+        <OzetBanner />
         <div className="icerik">
           <div className="bolumBaslik">
             <h2>Santraller</h2>
