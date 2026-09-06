@@ -62,7 +62,7 @@ export default function SantralDetaySayfasi() {
       const [e, p, sb, ak] = await Promise.all([
         istekAt(`/api/v1/santraller/${id}/ekipmanlar`),
         istekAt(`/api/v1/santraller/${id}/bakim-planlari`),
-        istekAt(`/api/v1/bakim-sablonlari?isletme_id=${s.isletme_id}`),
+        istekAt(`/api/v1/bakim-sablonlari?isletme_id=${s.isletme_id}&santral_id=${id}`),
         istekAt(`/api/v1/santraller/${id}/atanabilir-kullanicilar`),
       ]);
       setAtanabilirKullanicilar(ak.veri);
