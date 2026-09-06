@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { istekAt, tokenAl, yoneticiMi } from "../../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../../lib/api";
 import UstBar from "../../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -47,6 +47,8 @@ export default function SantralDetaySayfasi() {
     sorumlu_kullanici_id: "",
   });
   const [atanabilirKullanicilar, setAtanabilirKullanicilar] = useState(null);
+  const [santralDuzenleAcik, setSantralDuzenleAcik] = useState(false);
+  const [santralTaslak, setSantralTaslak] = useState(null);
 
   const verileriYukle = useCallback(async () => {
     if (!id) return;
@@ -154,6 +156,62 @@ export default function SantralDetaySayfasi() {
     }
   }
 
+  async function santralDuzenleyiBaslat() {
+    setSantralTaslak({
+      ad: santral.ad,
+      konum: santral.konum || "",
+      kurulu_guc_mw: santral.kurulu_guc_mw || "",
+      turbin_tipi: santral.turbin_tipi || "",
+    });
+    setSantralDuzenleAcik(true);
+  }
+
+  async function santralKaydet(e) {
+    e.preventDefault();
+    setHata(null);
+    setGonderiliyor(true);
+    try {
+      await istekAt(`/api/v1/santraller/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(santralTaslak),
+      });
+      setSantralDuzenleAcik(false);
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setGonderiliyor(false);
+    }
+  }
+
+  async function santralDurumDegistir() {
+    setHata(null);
+    try {
+      const yol =
+        santral.durum === "AKTIF"
+          ? `/api/v1/santraller/${id}/pasiflestir`
+          : `/api/v1/santraller/${id}/aktiflestir`;
+      await istekAt(yol, { method: "POST" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function santralSil() {
+    if (
+      !confirm(`"${santral.ad}" santralini kalıcı olarak silmek istediğinize emin misiniz?`)
+    )
+      return;
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/santraller/${id}`, { method: "DELETE" });
+      router.push("/santraller");
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   async function planiDurdur(planId) {
     if (!confirm("Bu bakım planını durdurmak istediğinize emin misiniz? Yeni görev üretilmeyecek.")) return;
     try {
@@ -202,11 +260,80 @@ export default function SantralDetaySayfasi() {
           </Link>
 
           <div className="detayUst">
-            <h2>{santral.ad}</h2>
+            <h2>
+              {santral.ad}
+              {santral.durum !== "AKTIF" && (
+                <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
+                  Pasif
+                </span>
+              )}
+            </h2>
             <div className="detayAlt">
               {santral.konum} {santral.turbin_tipi ? `— ${santral.turbin_tipi}` : ""}
             </div>
+            {platformAdminMi() && !santralDuzenleAcik && (
+              <div className="kullaniciAlt">
+                <button className="linkButon" onClick={santralDuzenleyiBaslat}>
+                  Düzenle
+                </button>
+                <button className="linkButon" onClick={santralDurumDegistir}>
+                  {santral.durum === "AKTIF" ? "Pasifleştir" : "Yeniden aktifleştir"}
+                </button>
+                <button className="linkButon" onClick={santralSil}>
+                  Sil
+                </button>
+              </div>
+            )}
           </div>
+
+          {santralDuzenleAcik && santralTaslak && (
+            <form onSubmit={santralKaydet} className="yonetimFormu">
+              <div className="alan">
+                <label>Santral adı</label>
+                <input
+                  required
+                  value={santralTaslak.ad}
+                  onChange={(e) => setSantralTaslak({ ...santralTaslak, ad: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>Konum</label>
+                <input
+                  value={santralTaslak.konum}
+                  onChange={(e) => setSantralTaslak({ ...santralTaslak, konum: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>Kurulu güç MW</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={santralTaslak.kurulu_guc_mw}
+                  onChange={(e) => setSantralTaslak({ ...santralTaslak, kurulu_guc_mw: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>Türbin tipi</label>
+                <input
+                  value={santralTaslak.turbin_tipi}
+                  onChange={(e) => setSantralTaslak({ ...santralTaslak, turbin_tipi: e.target.value })}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+                  Kaydet
+                </button>
+                <button
+                  type="button"
+                  className="kucukButon"
+                  style={{ background: "var(--ink-soft)" }}
+                  onClick={() => setSantralDuzenleAcik(false)}
+                >
+                  Vazgeç
+                </button>
+              </div>
+            </form>
+          )}
 
           {hata && <div className="hataKutusu">{hata}</div>}
 
