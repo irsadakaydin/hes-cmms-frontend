@@ -338,6 +338,11 @@ h1, h2, h3 {
   color: #1d4e75;
 }
 
+.rozet-TAMAMLANDI {
+  background: var(--green-soft, #dcf0e2);
+  color: #1e5c34;
+}
+
 .gorevAlt {
   font-size: 13px;
   color: var(--ink-soft);
