@@ -48,11 +48,14 @@ export default function SablonlarSayfasi() {
 
   const verileriYukle = useCallback(async () => {
     try {
-      const istekler = [istekAt("/api/v1/bakim-sablonlari/diger-holdingler")];
+      const istekler = [];
+      if (platformAdminMi) istekler.push(istekAt("/api/v1/bakim-sablonlari/diger-holdingler"));
       if (platformAdminMi) istekler.push(istekAt("/api/v1/isletmeler"));
       const sonuclar = await Promise.all(istekler);
-      setDigerHoldingSablonlari(sonuclar[0].veri);
-      if (sonuclar[1]) setIsletmeler(sonuclar[1].veri);
+      if (platformAdminMi) {
+        setDigerHoldingSablonlari(sonuclar[0].veri);
+        setIsletmeler(sonuclar[1].veri);
+      }
 
       if (!platformAdminMi || seciliHoldingId) {
         const hedefId = platformAdminMi ? seciliHoldingId : kendiIsletmeId;

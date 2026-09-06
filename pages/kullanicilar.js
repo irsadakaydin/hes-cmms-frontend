@@ -12,6 +12,8 @@ const ROL_ETIKETLERI = {
   IZLEYICI: "İzleyici",
 };
 
+const ROL_SIRASI = { ADMIN: 4, ISLETME_ADMIN: 3, SANTRAL_SORUMLUSU: 2, SAHA_PERSONELI: 1, IZLEYICI: 1 };
+
 // Platform Admin (ADMIN) seçeneği yalnızca oturum açan kullanıcı zaten
 // Platform Admin ise gösterilir — bir İşletme Admin başka birini
 // Platform Admin yapamaz (bu, backend'de de ayrıca zorlanıyor).
@@ -143,6 +145,20 @@ export default function KullanicilarSayfasi() {
         ? `/api/v1/kullanicilar/${kullanici.kullanici_id}/engelle`
         : `/api/v1/kullanicilar/${kullanici.kullanici_id}/engeli-kaldir`;
       await istekAt(yol, { method: "POST" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function kullaniciSil(kullanici) {
+    if (!confirm(`"${kullanici.ad_soyad}" adlı kullanıcıyı kalıcı olarak silmek istediğinize emin misiniz?`))
+      return;
+    setHata(null);
+    setBilgi(null);
+    try {
+      await istekAt(`/api/v1/kullanicilar/${kullanici.kullanici_id}`, { method: "DELETE" });
+      setBilgi("Kullanıcı silindi.");
       await verileriYukle();
     } catch (err) {
       setHata(err.message);
@@ -366,6 +382,11 @@ export default function KullanicilarSayfasi() {
                   <button className="linkButon" onClick={() => engelleAcKapa(k)}>
                     {k.aktif_mi ? "Hesabı engelle" : "Engeli kaldır"}
                   </button>
+                  {ROL_SIRASI[kullaniciAl()?.rol] > ROL_SIRASI[k.rol] && (
+                    <button className="linkButon" onClick={() => kullaniciSil(k)}>
+                      Sil
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
