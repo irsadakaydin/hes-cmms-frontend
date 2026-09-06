@@ -30,6 +30,7 @@ export default function UstBar() {
           {yonetici && <Link href="/sablonlar">Bakım Şablonları</Link>}
           {yonetici && <Link href="/rapor-olustur">Rapor Oluştur</Link>}
           {isletmeYoneticisi && <Link href="/kullanicilar">Kullanıcılar</Link>}
+          {isletmeYoneticisi && <Link href="/giris-loglari">Giriş Logları</Link>}
         </nav>
       </div>
       <div className="ustBarSag">
