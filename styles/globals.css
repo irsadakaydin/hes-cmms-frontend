@@ -660,6 +660,78 @@ h1, h2, h3 {
   font-weight: 600;
 }
 
+/* ---------- Mesajlar ---------- */
+
+.aliciListesi {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  padding: 10px;
+}
+
+.aliciSatiri {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.mesajKarti {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.mesajKarti.mesajOkunmamis {
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.mesajUst {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.mesajIcerikKapali {
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mesajIcerikAcik {
+  font-size: 14px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+}
+
+.okunduCizgisi {
+  font-size: 11px;
+  font-weight: 600;
+  padding-top: 6px;
+  border-top: 3px solid transparent;
+}
+
+.okunduCizgisi.okunduYesil {
+  border-top-color: var(--green);
+  color: var(--green);
+}
+
+.okunduCizgisi.okunduKirmizi {
+  border-top-color: var(--red);
+  color: var(--red);
+}
+
 .yonetimFormu {
   background: var(--surface);
   border: 1px solid var(--line);
