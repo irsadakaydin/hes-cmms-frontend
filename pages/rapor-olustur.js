@@ -105,6 +105,7 @@ export default function RaporOlusturSayfasi() {
         donem === "OZEL" ? { baslangic: ozelBaslangic, bitis: ozelBitis } : donemTarihAraligi(donem);
       const parametreler = new URLSearchParams();
       if (santralId) parametreler.set("santral_id", santralId);
+      else if (platformAdmin && seciliHoldingId) parametreler.set("isletme_id", seciliHoldingId);
       if (periyot) parametreler.set("periyot", periyot);
       if (sorumluId) parametreler.set("sorumlu_kullanici_id", sorumluId);
       if (baslangic) parametreler.set("baslangic", baslangic);
