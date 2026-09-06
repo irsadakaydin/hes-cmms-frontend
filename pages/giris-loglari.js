@@ -40,7 +40,8 @@ export default function GirisLoglariSayfasi() {
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [seciliSantralIdleri, setSeciliSantralIdleri] = useState([]);
   const [santralPaneliAcik, setSantralPaneliAcik] = useState(false);
-  const [seciliKisiId, setSeciliKisiId] = useState("");
+  const [seciliKisiIdleri, setSeciliKisiIdleri] = useState([]);
+  const [kisiPaneliAcik, setKisiPaneliAcik] = useState(false);
   const [baslangic, setBaslangic] = useState("");
   const [bitis, setBitis] = useState("");
 
@@ -72,18 +73,18 @@ export default function GirisLoglariSayfasi() {
       .catch((err) => setHata(err.message));
   }, [router]);
 
-  // Platform Admin holding ve/veya santral seçtiğinde, Kişi kutusunu da
-  // yalnızca o kapsamdaki kişilerle yeniden dolduruyoruz — aksi halde
-  // kutuda sistemdeki HERKES görünüyordu, holding ayırt etmeksizin.
+  // Holding ve/veya santral seçildiğinde, Kişi kutusunu da yalnızca o
+  // kapsamdaki kişilerle yeniden dolduruyoruz — aksi halde kutuda sistemdeki
+  // HERKES görünüyordu, holding/santral ayırt etmeksizin. (Hem GM hem
+  // İşletme Admin için geçerli.)
   useEffect(() => {
-    if (!platformAdmin) return;
     const p = new URLSearchParams();
     if (seciliSantralIdleri.length > 0) {
       seciliSantralIdleri.forEach((id) => p.append("santral_idleri", id));
-    } else if (seciliHoldingId) {
+    } else if (platformAdmin && seciliHoldingId) {
       p.set("isletme_id", seciliHoldingId);
     }
-    setSeciliKisiId("");
+    setSeciliKisiIdleri([]);
     istekAt(`/api/v1/giris-loglari/filtre-secenekleri?${p.toString()}`)
       .then((veri) => setKisiler(veri.kisiler))
       .catch((err) => setHata(err.message));
@@ -91,17 +92,17 @@ export default function GirisLoglariSayfasi() {
 
   const parametreOlustur = useCallback(() => {
     const p = new URLSearchParams();
-    if (platformAdmin && seciliSantralIdleri.length > 0) {
+    if (seciliSantralIdleri.length > 0) {
       seciliSantralIdleri.forEach((id) => p.append("santral_idleri", id));
     } else if (platformAdmin && seciliHoldingId) {
       p.set("isletme_id", seciliHoldingId);
     }
-    if (seciliKisiId) p.set("kullanici_id", seciliKisiId);
+    seciliKisiIdleri.forEach((id) => p.append("kullanici_idleri", id));
     if (baslangic) p.set("baslangic", baslangic);
     if (bitis) p.set("bitis", bitis);
     p.set("limit", "50");
     return p;
-  }, [platformAdmin, seciliHoldingId, seciliSantralIdleri, seciliKisiId, baslangic, bitis]);
+  }, [platformAdmin, seciliHoldingId, seciliSantralIdleri, seciliKisiIdleri, baslangic, bitis]);
 
   const kayitlariGetir = useCallback(async () => {
     setHata(null);
@@ -125,6 +126,12 @@ export default function GirisLoglariSayfasi() {
     });
   }
 
+  function kisiSecimiDegistir(kisiId) {
+    setSeciliKisiIdleri((onceki) =>
+      onceki.includes(kisiId) ? onceki.filter((id) => id !== kisiId) : [...onceki, kisiId]
+    );
+  }
+
   async function pdfIndir() {
     setIndiriliyor(true);
     setHata(null);
@@ -141,9 +148,9 @@ export default function GirisLoglariSayfasi() {
     }
   }
 
-  const gosterilecekSantraller = seciliHoldingId
+  const gosterilecekSantraller = platformAdmin
     ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
-    : [];
+    : santraller || [];
 
   return (
     <>
@@ -187,7 +194,7 @@ export default function GirisLoglariSayfasi() {
               </div>
             )}
 
-            {platformAdmin && seciliHoldingId && (
+            {(!platformAdmin || seciliHoldingId) && (
               <div className="alan">
                 <label>Santraller — birden fazla seçebilirsiniz</label>
                 <button
@@ -218,16 +225,26 @@ export default function GirisLoglariSayfasi() {
             )}
 
             <div className="alan">
-              <label>Kişi</label>
-              <select value={seciliKisiId} onChange={(e) => setSeciliKisiId(e.target.value)}>
-                <option value="">Tüm Kişiler</option>
-                {kisiler &&
-                  kisiler.map((k) => (
-                    <option key={k.kullanici_id} value={k.kullanici_id}>
-                      {k.ad_soyad}
-                    </option>
-                  ))}
-              </select>
+              <label>Kişi — birden fazla seçebilirsiniz</label>
+              <button type="button" className="periyotGrupBasligi" onClick={() => setKisiPaneliAcik((v) => !v)}>
+                {kisiPaneliAcik ? "▾" : "▸"}{" "}
+                {seciliKisiIdleri.length > 0 ? `${seciliKisiIdleri.length} kişi seçili` : "Tüm Kişiler (seçmek için tıklayın)"}
+              </button>
+              {kisiPaneliAcik && (
+                <div className="aliciListesi">
+                  {kisiler &&
+                    kisiler.map((k) => (
+                      <label key={k.kullanici_id} className="aliciSatiri">
+                        <input
+                          type="checkbox"
+                          checked={seciliKisiIdleri.includes(k.kullanici_id)}
+                          onChange={() => kisiSecimiDegistir(k.kullanici_id)}
+                        />
+                        {k.ad_soyad}
+                      </label>
+                    ))}
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: "12px" }}>
