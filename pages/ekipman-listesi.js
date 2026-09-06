@@ -80,12 +80,23 @@ export default function EkipmanListesiSayfasi() {
     }
   }
 
+  async function ekipmaniPasiflestir(ekipmanId) {
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/ekipmanlar/${ekipmanId}/pasiflestir`, { method: "POST" });
+      setBilgi("Ekipman pasifleştirildi.");
+      await ekipmanlariGetir(seciliSantralId);
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   async function ekipmaniSil(ekipmanId) {
-    if (!confirm("Bu ekipmanı pasifleştirmek istediğinize emin misiniz?")) return;
+    if (!confirm("Bu ekipmanı KALICI OLARAK silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
     setHata(null);
     try {
       await istekAt(`/api/v1/ekipmanlar/${ekipmanId}`, { method: "DELETE" });
-      setBilgi("Ekipman pasifleştirildi.");
+      setBilgi("Ekipman kalıcı olarak silindi.");
       await ekipmanlariGetir(seciliSantralId);
     } catch (err) {
       setHata(err.message);
@@ -246,10 +257,13 @@ export default function EkipmanListesiSayfasi() {
                           Yeniden aktifleştir
                         </button>
                       ) : (
-                        <button className="linkButon" onClick={() => ekipmaniSil(e.ekipman_id)}>
-                          Sil (pasifleştir)
+                        <button className="linkButon" onClick={() => ekipmaniPasiflestir(e.ekipman_id)}>
+                          Pasifleştir
                         </button>
                       )}
+                      <button className="linkButon" onClick={() => ekipmaniSil(e.ekipman_id)}>
+                        Sil
+                      </button>
                     </div>
                   )}
                 </div>
