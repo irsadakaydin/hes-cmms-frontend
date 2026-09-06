@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
 import { istekAt, platformAdminMi } from "../lib/api";
 
 const DONEM_ETIKETLERI = {
@@ -33,9 +34,13 @@ function donemTarihAraligi(donem) {
   }
 }
 
-function OzetDaire({ sayi, etiket, renkA, renkB }) {
+function OzetDaire({ sayi, etiket, renkA, renkB, onClick }) {
   return (
-    <div className="ozetDaireKutu">
+    <div
+      className={`ozetDaireKutu ${onClick ? "ozetDaireTiklanabilir" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+    >
       <div
         className="ozetDaire"
         style={{ background: `radial-gradient(circle at 35% 30%, ${renkB}, ${renkA})` }}
@@ -48,6 +53,7 @@ function OzetDaire({ sayi, etiket, renkA, renkB }) {
 }
 
 export default function OzetBanner() {
+  const router = useRouter();
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
 
   const [donem, setDonem] = useState("AYLIK");
@@ -133,9 +139,27 @@ export default function OzetBanner() {
             <div className="ozetSantralGrubu" key={v.santral_id}>
               <div className="ozetSantralAdi">{v.santral_adi}</div>
               <div className="ozetDaireSira">
-                <OzetDaire sayi={v.devam_eden} etiket="Devam Eden" renkA="#c17a24" renkB="#f2c98a" />
-                <OzetDaire sayi={v.geciken} etiket="Geciken" renkA="#a83b2e" renkB="#e79a8c" />
-                <OzetDaire sayi={v.tamamlanan} etiket="Tamamlanan" renkA="#2c7a4b" renkB="#8fd1a8" />
+                <OzetDaire
+                  sayi={v.devam_eden}
+                  etiket="Devam Eden"
+                  renkA="#c17a24"
+                  renkB="#f2c98a"
+                  onClick={() => router.push(`/bakimlar?santral_id=${v.santral_id}&sekme=DEVAM_EDEN`)}
+                />
+                <OzetDaire
+                  sayi={v.geciken}
+                  etiket="Geciken"
+                  renkA="#a83b2e"
+                  renkB="#e79a8c"
+                  onClick={() => router.push(`/bakimlar?santral_id=${v.santral_id}&sekme=GECIKEN`)}
+                />
+                <OzetDaire
+                  sayi={v.tamamlanan}
+                  etiket="Tamamlanan"
+                  renkA="#2c7a4b"
+                  renkB="#8fd1a8"
+                  onClick={() => router.push(`/bakimlar?santral_id=${v.santral_id}&sekme=TAMAMLANAN`)}
+                />
               </div>
             </div>
           ))}
