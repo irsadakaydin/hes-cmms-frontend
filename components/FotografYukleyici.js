@@ -16,6 +16,7 @@ const JPEG_KALITE = 0.72;
 export default function FotografYukleyici({ fotograflar, onDegisti }) {
   const inputRef = useRef(null);
   const [yukleniyor, setYukleniyor] = useState(false);
+  const [galeriAcik, setGaleriAcik] = useState(false);
 
   function kucult(dosya) {
     return new Promise((resolve, reject) => {
@@ -53,6 +54,7 @@ export default function FotografYukleyici({ fotograflar, onDegisti }) {
     try {
       const yeniler = await Promise.all(dosyalar.map(kucult));
       onDegisti([...fotograflar, ...yeniler]);
+      setGaleriAcik(true);
     } catch {
       // Sessizce yoksay — kullanıcı fotoğrafsız da devam edebilir
     } finally {
@@ -67,16 +69,27 @@ export default function FotografYukleyici({ fotograflar, onDegisti }) {
 
   return (
     <div>
-      <div className="fotografListesi">
-        {fotograflar.map((f, i) => (
-          <div className="fotografKarti" key={i}>
-            <img src={f} alt={`Fotoğraf ${i + 1}`} />
-            <button type="button" onClick={() => kaldir(i)} aria-label="Fotoğrafı kaldır">
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+      <button
+        type="button"
+        className="fotograflarSekmesi"
+        onClick={() => setGaleriAcik((v) => !v)}
+      >
+        {galeriAcik ? "▾" : "▸"} Fotoğraflar ({fotograflar.length})
+      </button>
+
+      {galeriAcik && (
+        <div className="fotografListesi">
+          {fotograflar.length === 0 && <div className="gorevAlt">Henüz fotoğraf eklenmedi.</div>}
+          {fotograflar.map((f, i) => (
+            <div className="fotografKarti" key={i}>
+              <img src={f} alt={`Fotoğraf ${i + 1}`} />
+              <button type="button" onClick={() => kaldir(i)} aria-label="Fotoğrafı kaldır">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <input
         ref={inputRef}
