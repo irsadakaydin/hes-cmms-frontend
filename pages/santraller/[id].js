@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi, isletmeYoneticisiMi } from "../../lib/api";
 import UstBar from "../../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -108,7 +108,7 @@ export default function SantralDetaySayfasi() {
   }
 
   async function ekipmaniSil(ekipmanId) {
-    if (!confirm("Bu ekipmanı pasifleştirmek istediğinize emin misiniz? (HURDA olarak işaretlenir, silinmez.)"))
+    if (!confirm("Bu ekipmanı KALICI OLARAK silmek istediğinize emin misiniz? Bu işlem geri alınamaz."))
       return;
     setHata(null);
     try {
@@ -535,8 +535,19 @@ export default function SantralDetaySayfasi() {
                         Yeniden aktifleştir
                       </button>
                     ) : (
+                      <button
+                        className="linkButon"
+                        onClick={async () => {
+                          await istekAt(`/api/v1/ekipmanlar/${e.ekipman_id}/pasiflestir`, { method: "POST" });
+                          await verileriYukle();
+                        }}
+                      >
+                        Pasifleştir
+                      </button>
+                    )}
+                    {isletmeYoneticisiMi() && (
                       <button className="linkButon" onClick={() => ekipmaniSil(e.ekipman_id)}>
-                        Sil (pasifleştir)
+                        Sil
                       </button>
                     )}
                   </div>
