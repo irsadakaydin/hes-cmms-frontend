@@ -37,7 +37,7 @@ export default function SantralDetaySayfasi() {
   const [planGorunumu, setPlanGorunumu] = useState("DEVAM_EDEN");
   const [gonderiliyor, setGonderiliyor] = useState(false);
 
-  const [yeniEkipman, setYeniEkipman] = useState({ ad: "", tip: "", seri_no: "", uretici: "" });
+  const [yeniEkipman, setYeniEkipman] = useState({ ad: "", tip: "", unite_no: "", seri_no: "", uretici: "" });
   const [duzenlenenEkipman, setDuzenlenenEkipman] = useState(null);
   const [yeniPlan, setYeniPlan] = useState({
     ekipman_id: "",
@@ -92,10 +92,10 @@ export default function SantralDetaySayfasi() {
     setHata(null);
     setGonderiliyor(true);
     try {
-      const { ekipman_id, ad, tip, seri_no, uretici } = duzenlenenEkipman;
+      const { ekipman_id, ad, tip, unite_no, seri_no, uretici } = duzenlenenEkipman;
       await istekAt(`/api/v1/ekipmanlar/${ekipman_id}`, {
         method: "PATCH",
-        body: JSON.stringify({ ad, tip, seri_no, uretici }),
+        body: JSON.stringify({ ad, tip, unite_no, seri_no, uretici }),
       });
       setDuzenlenenEkipman(null);
       await verileriYukle();
@@ -398,6 +398,14 @@ export default function SantralDetaySayfasi() {
                 />
               </div>
               <div className="alan">
+                <label>Ünite No (isteğe bağlı)</label>
+                <input
+                  value={yeniEkipman.unite_no}
+                  onChange={(e) => setYeniEkipman({ ...yeniEkipman, unite_no: e.target.value })}
+                  placeholder="Ör. Ünite 1"
+                />
+              </div>
+              <div className="alan">
                 <label>Tip</label>
                 <input
                   required
@@ -443,6 +451,13 @@ export default function SantralDetaySayfasi() {
                     />
                   </div>
                   <div className="alan">
+                    <label>Ünite No</label>
+                    <input
+                      value={duzenlenenEkipman.unite_no || ""}
+                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, unite_no: ev.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
                     <label>Tip</label>
                     <input
                       required
@@ -482,6 +497,7 @@ export default function SantralDetaySayfasi() {
                 <div className="satirKart" key={e.ekipman_id}>
                   <div>
                     <strong>{e.ad}</strong> — {e.tip}
+                    {e.unite_no && ` (${e.unite_no})`}
                     {e.durum === "HURDA" && (
                       <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
                         Pasif
