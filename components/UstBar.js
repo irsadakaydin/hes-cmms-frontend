@@ -22,6 +22,7 @@ export default function UstBar() {
         </div>
         <nav className="ustBarNav">
           <Link href="/gorevler">Görevlerim</Link>
+          {yonetici && <Link href="/mesajlar">Mesajlar</Link>}
           {platformAdmin && <Link href="/holdingler">Holdingler</Link>}
           {yonetici && <Link href="/santraller">Santraller</Link>}
           {yonetici && <Link href="/ekipman-olustur">Ekipman Oluştur</Link>}
