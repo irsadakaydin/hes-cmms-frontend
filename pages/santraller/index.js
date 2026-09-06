@@ -5,22 +5,6 @@ import Link from "next/link";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../../lib/api";
 import UstBar from "../../components/UstBar";
 
-/** Santralleri isletme_adi'na göre gruplar; backend zaten holding adına
- * göre alfabetik sıralı döndürdüğü için gruplar ve içindeki santraller
- * de otomatik sıralı çıkar. */
-function holdinglereGoreGrupla(santraller) {
-  const gruplar = [];
-  const indeksler = {};
-  for (const s of santraller) {
-    if (!(s.isletme_id in indeksler)) {
-      indeksler[s.isletme_id] = gruplar.length;
-      gruplar.push({ isletme_id: s.isletme_id, isletme_adi: s.isletme_adi, santraller: [] });
-    }
-    gruplar[indeksler[s.isletme_id]].santraller.push(s);
-  }
-  return gruplar;
-}
-
 function bosForm() {
   return { isletme_id: "", ad: "", konum: "", kurulu_guc_mw: "", turbin_tipi: "" };
 }
@@ -31,6 +15,7 @@ export default function SantrallerSayfasi() {
 
   const [santraller, setSantraller] = useState(null);
   const [holdingler, setHoldingler] = useState(null);
+  const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
   const [formuAcik, setFormuAcik] = useState(false);
@@ -69,13 +54,10 @@ export default function SantrallerSayfasi() {
     try {
       await istekAt("/api/v1/santraller", {
         method: "POST",
-        body: JSON.stringify({
-          ...taslak,
-          kurulu_guc_mw: taslak.kurulu_guc_mw || undefined,
-        }),
+        body: JSON.stringify({ ...taslak, kurulu_guc_mw: taslak.kurulu_guc_mw || undefined }),
       });
       setBilgi("Santral oluşturuldu.");
-      setTaslak(bosForm());
+      setTaslak({ ...bosForm(), isletme_id: seciliHoldingId });
       setFormuAcik(false);
       await verileriYukle();
     } catch (err) {
@@ -85,7 +67,11 @@ export default function SantrallerSayfasi() {
     }
   }
 
-  const gruplar = santraller ? holdinglereGoreGrupla(santraller) : null;
+  // Platform Admin için: holding seçilmeden hiçbir santral listelenmez —
+  // tüm holdinglerin santralleri bir arada, karışık görünmesin diye.
+  const gosterilecekSantraller = platformAdmin
+    ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
+    : santraller;
 
   return (
     <>
@@ -98,9 +84,15 @@ export default function SantrallerSayfasi() {
           <div className="bolumBaslik">
             <h2>Santraller</h2>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              {santraller && <span className="sayac">{santraller.length} santral</span>}
+              {!platformAdmin && santraller && <span className="sayac">{santraller.length} santral</span>}
               {platformAdmin && (
-                <button className="kucukButon" onClick={() => setFormuAcik((v) => !v)}>
+                <button
+                  className="kucukButon"
+                  onClick={() => {
+                    setTaslak({ ...bosForm(), isletme_id: seciliHoldingId });
+                    setFormuAcik((v) => !v);
+                  }}
+                >
                   {formuAcik ? "Vazgeç" : "+ Yeni Santral"}
                 </button>
               )}
@@ -109,6 +101,21 @@ export default function SantrallerSayfasi() {
 
           {hata && <div className="hataKutusu">{hata}</div>}
           {bilgi && <div className="basariliKutu">{bilgi}</div>}
+
+          {platformAdmin && (
+            <div className="alan" style={{ maxWidth: "340px" }}>
+              <label>Holding</label>
+              <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
+                <option value="">Bir holding seçin…</option>
+                {holdingler &&
+                  holdingler.map((h) => (
+                    <option key={h.isletme_id} value={h.isletme_id}>
+                      {h.ad}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           {formuAcik && (
             <form onSubmit={santralEkle} className="yonetimFormu">
@@ -130,12 +137,7 @@ export default function SantrallerSayfasi() {
               </div>
               <div className="alan">
                 <label>Santral adı</label>
-                <input
-                  required
-                  value={taslak.ad}
-                  onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
-                  placeholder="Ör. Adıgüzel HES"
-                />
+                <input required value={taslak.ad} onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })} />
               </div>
               <div className="alan">
                 <label>Konum (isteğe bağlı)</label>
@@ -155,7 +157,6 @@ export default function SantrallerSayfasi() {
                 <input
                   value={taslak.turbin_tipi}
                   onChange={(e) => setTaslak({ ...taslak, turbin_tipi: e.target.value })}
-                  placeholder="Ör. Francis"
                 />
               </div>
               <button className="birincilButon" type="submit" disabled={gonderiliyor}>
@@ -166,27 +167,25 @@ export default function SantrallerSayfasi() {
 
           {!santraller && !hata && <div className="yukleniyor">Yükleniyor…</div>}
 
-          {gruplar &&
-            gruplar.map((g) => (
-              <div key={g.isletme_id} style={{ marginBottom: "28px" }}>
-                <h3 className="holdingBasligi">{g.isletme_adi}</h3>
-                {g.santraller.map((s) => (
-                  <Link key={s.santral_id} href={`/santraller/${s.santral_id}`} className="santralKart">
-                    <div className="gorevSantral">
-                      {s.ad}
-                      {s.durum !== "AKTIF" && (
-                        <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
-                          {s.durum === "DEVRE_DISI" ? "Pasif" : s.durum}
-                        </span>
-                      )}
-                    </div>
-                    <div className="gorevAlt">
-                      {s.konum} {s.turbin_tipi ? `— ${s.turbin_tipi}` : ""}{" "}
-                      {s.kurulu_guc_mw ? `— ${s.kurulu_guc_mw} MW` : ""}
-                    </div>
-                  </Link>
-                ))}
-              </div>
+          {platformAdmin && !seciliHoldingId && (
+            <div className="bosDurum">Santralleri görmek için yukarıdan bir holding seçin.</div>
+          )}
+
+          {gosterilecekSantraller &&
+            gosterilecekSantraller.map((s) => (
+              <Link key={s.santral_id} href={`/santraller/${s.santral_id}`} className="santralKart">
+                <div className="gorevSantral">
+                  {s.ad}
+                  {s.durum !== "AKTIF" && (
+                    <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
+                      {s.durum === "DEVRE_DISI" ? "Pasif" : s.durum}
+                    </span>
+                  )}
+                </div>
+                <div className="gorevAlt">
+                  {s.konum} {s.turbin_tipi ? `— ${s.turbin_tipi}` : ""} {s.kurulu_guc_mw ? `— ${s.kurulu_guc_mw} MW` : ""}
+                </div>
+              </Link>
             ))}
         </div>
       </div>
