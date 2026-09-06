@@ -711,13 +711,13 @@ export default function SantralDetaySayfasi() {
                           </option>
                         ))}
                     </select>
-                    <button className="linkButon" onClick={() => planiDurdur(p.plan_id)}>
+                    <button className="linkButon" style={{ marginRight: "14px" }} onClick={() => planiDurdur(p.plan_id)}>
                       Planı durdur
                     </button>
                   </>
                 )}
                 {!p.aktif_mi && (
-                  <button className="linkButon" onClick={() => planiAktiflestir(p.plan_id)}>
+                  <button className="linkButon" style={{ marginRight: "14px" }} onClick={() => planiAktiflestir(p.plan_id)}>
                     Yeniden aktifleştir
                   </button>
                 )}
