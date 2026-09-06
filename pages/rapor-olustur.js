@@ -62,6 +62,7 @@ export default function RaporOlusturSayfasi() {
   const [santralId, setSantralId] = useState("");
   const [periyot, setPeriyot] = useState("");
   const [sorumluId, setSorumluId] = useState("");
+  const [durum, setDurum] = useState("");
   const [donem, setDonem] = useState("TUM_ZAMANLAR");
   const [ozelBaslangic, setOzelBaslangic] = useState("");
   const [ozelBitis, setOzelBitis] = useState("");
@@ -108,6 +109,7 @@ export default function RaporOlusturSayfasi() {
       else if (platformAdmin && seciliHoldingId) parametreler.set("isletme_id", seciliHoldingId);
       if (periyot) parametreler.set("periyot", periyot);
       if (sorumluId) parametreler.set("sorumlu_kullanici_id", sorumluId);
+      if (durum) parametreler.set("durum", durum);
       if (baslangic) parametreler.set("baslangic", baslangic);
       if (bitis) parametreler.set("bitis", bitis);
       const sorguMetni = parametreler.toString() ? `?${parametreler.toString()}` : "";
@@ -190,6 +192,16 @@ export default function RaporOlusturSayfasi() {
                           {etiket}
                         </option>
                       ))}
+                    </select>
+                  </div>
+
+                  <div className="alan">
+                    <label>Durum</label>
+                    <select value={durum} onChange={(e) => setDurum(e.target.value)}>
+                      <option value="">Tümü</option>
+                      <option value="TAMAMLANDI">Tamamlanan</option>
+                      <option value="GECIKTI">Geciken</option>
+                      <option value="BEKLIYOR">Bekleyen</option>
                     </select>
                   </div>
 
