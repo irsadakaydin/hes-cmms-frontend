@@ -1,156 +1,260 @@
-const express = require("express");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { withDbContext } = require("../middleware/dbContext");
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+import Head from "next/head";
+import { istekAt, tokenAl, yoneticiMi } from "../lib/api";
+import UstBar from "../components/UstBar";
 
-const router = express.Router();
-router.use(requireAuth, withDbContext);
-
-const MESAJ_YONETICI_ROLLERI = ["SANTRAL_SORUMLUSU", "ISLETME_ADMIN", "ADMIN"];
-
-function platformAdminMi(req) {
-  return req.user.rol === "ADMIN";
+function tarihSaatFormatla(deger) {
+  if (!deger) return "";
+  return new Date(deger).toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-// GET /api/v1/mesajlar/alicilar — mesaj gönderilebilecek kullanıcıları listeler.
-// Platform Admin (ADMIN) herkesi görür; diğerleri yalnızca KENDİ holdingindeki
-// kullanıcıları görür (kendisi hariç).
-router.get("/alicilar", requireRole(...MESAJ_YONETICI_ROLLERI), async (req, res, next) => {
-  try {
-    const params = [req.user.kullanici_id];
-    let sorgu = `SELECT kullanici_id, ad_soyad, eposta, rol FROM kullanici
-                 WHERE aktif_mi = TRUE AND kullanici_id <> $1`;
-    if (!platformAdminMi(req)) {
-      params.push(req.user.isletme_id);
-      sorgu += ` AND isletme_id = $${params.length}`;
+export default function MesajlarSayfasi() {
+  const router = useRouter();
+  const [sekme, setSekme] = useState("GELEN");
+  const [alicilar, setAlicilar] = useState(null);
+  const [gelenler, setGelenler] = useState(null);
+  const [gidenler, setGidenler] = useState(null);
+  const [hata, setHata] = useState(null);
+  const [bilgi, setBilgi] = useState(null);
+
+  const [formuAcik, setFormuAcik] = useState(false);
+  const [seciliAlicilar, setSeciliAlicilar] = useState([]);
+  const [mesajIcerigi, setMesajIcerigi] = useState("");
+  const [gonderiliyor, setGonderiliyor] = useState(false);
+
+  const [acikMesajId, setAcikMesajId] = useState(null);
+
+  const verileriYukle = useCallback(async () => {
+    try {
+      const [a, g, gi] = await Promise.all([
+        istekAt("/api/v1/mesajlar/alicilar"),
+        istekAt("/api/v1/mesajlar/gelen-kutusu"),
+        istekAt("/api/v1/mesajlar/giden-kutusu"),
+      ]);
+      setAlicilar(a.veri);
+      setGelenler(g.veri);
+      setGidenler(gi.veri);
+    } catch (err) {
+      setHata(err.message);
     }
-    sorgu += ` ORDER BY ad_soyad`;
+  }, []);
 
-    const { rows } = await req.db.query(sorgu, params);
-    res.json({ veri: rows });
-  } catch (err) {
-    next(err);
-  }
-});
+  useEffect(() => {
+    if (!tokenAl()) {
+      router.replace("/");
+      return;
+    }
+    if (!yoneticiMi()) {
+      router.replace("/gorevler");
+      return;
+    }
+    verileriYukle();
+  }, [verileriYukle, router]);
 
-// GET /api/v1/mesajlar/gelen-kutusu — oturum açan kullanıcının aldığı mesajlar
-router.get("/gelen-kutusu", async (req, res, next) => {
-  try {
-    const { rows } = await req.db.query(
-      `SELECT m.mesaj_id, m.icerik, m.gonderim_tarihi, m.okundu_mu, m.okunma_tarihi,
-              g.kullanici_id AS gonderen_id, g.ad_soyad AS gonderen_adi
-       FROM mesaj m
-       JOIN kullanici g ON g.kullanici_id = m.gonderen_kullanici_id
-       WHERE m.alici_kullanici_id = $1
-       ORDER BY m.gonderim_tarihi DESC`,
-      [req.user.kullanici_id]
+  function aliciSecimiDegistir(kullaniciId) {
+    setSeciliAlicilar((onceki) =>
+      onceki.includes(kullaniciId) ? onceki.filter((id) => id !== kullaniciId) : [...onceki, kullaniciId]
     );
-    res.json({ veri: rows });
-  } catch (err) {
-    next(err);
   }
-});
 
-// GET /api/v1/mesajlar/giden-kutusu — oturum açan kullanıcının gönderdiği mesajlar
-// (her birinin yanında alıcının o mesajı okuyup okumadığı bilgisi)
-router.get("/giden-kutusu", async (req, res, next) => {
-  try {
-    const { rows } = await req.db.query(
-      `SELECT m.mesaj_id, m.icerik, m.gonderim_tarihi, m.okundu_mu, m.okunma_tarihi,
-              a.kullanici_id AS alici_id, a.ad_soyad AS alici_adi
-       FROM mesaj m
-       JOIN kullanici a ON a.kullanici_id = m.alici_kullanici_id
-       WHERE m.gonderen_kullanici_id = $1
-       ORDER BY m.gonderim_tarihi DESC`,
-      [req.user.kullanici_id]
-    );
-    res.json({ veri: rows });
-  } catch (err) {
-    next(err);
+  function hepsiniSec() {
+    setSeciliAlicilar(alicilar.map((k) => k.kullanici_id));
   }
-});
 
-// POST /api/v1/mesajlar — tek veya toplu mesaj gönderir.
-// Gövde: { alici_kullanici_idleri: [uuid, ...], icerik: "..." }
-router.post("/", requireRole(...MESAJ_YONETICI_ROLLERI), async (req, res, next) => {
-  try {
-    const { alici_kullanici_idleri, icerik } = req.body;
-    if (!Array.isArray(alici_kullanici_idleri) || alici_kullanici_idleri.length === 0 || !icerik?.trim()) {
-      return res.status(400).json({
-        hata_kodu: "EKSIK_ALAN",
-        mesaj: "alici_kullanici_idleri (en az bir alıcı) ve icerik alanları zorunludur.",
+  function secimiTemizle() {
+    setSeciliAlicilar([]);
+  }
+
+  function yanitla(gonderenId) {
+    setSeciliAlicilar([gonderenId]);
+    setMesajIcerigi("");
+    setFormuAcik(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function mesajGonder(e) {
+    e.preventDefault();
+    setHata(null);
+    setBilgi(null);
+    if (seciliAlicilar.length === 0) {
+      setHata("En az bir alıcı seçmelisiniz.");
+      return;
+    }
+    if (!mesajIcerigi.trim()) {
+      setHata("Mesaj içeriği boş olamaz.");
+      return;
+    }
+    setGonderiliyor(true);
+    try {
+      const sonuc = await istekAt("/api/v1/mesajlar", {
+        method: "POST",
+        body: JSON.stringify({ alici_kullanici_idleri: seciliAlicilar, icerik: mesajIcerigi }),
       });
+      setBilgi(sonuc.mesaj);
+      setSeciliAlicilar([]);
+      setMesajIcerigi("");
+      setFormuAcik(false);
+      await verileriYukle();
+      setSekme("GIDEN");
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setGonderiliyor(false);
     }
-
-    // Alıcıların gerçekten mesaj gönderenin izinli kapsamında olduğunu doğrula
-    // (Platform Admin hariç: yalnızca kendi holdingindeki kullanıcılara gönderilebilir)
-    const params = [alici_kullanici_idleri];
-    let kapsamKosulu = "";
-    if (!platformAdminMi(req)) {
-      params.push(req.user.isletme_id);
-      kapsamKosulu = ` AND isletme_id = $${params.length}`;
-    }
-    const { rows: gecerliAlicilar } = await req.db.query(
-      `SELECT kullanici_id FROM kullanici WHERE kullanici_id = ANY($1::uuid[]) AND aktif_mi = TRUE ${kapsamKosulu}`,
-      params
-    );
-    const gecerliIdSeti = new Set(gecerliAlicilar.map((r) => r.kullanici_id));
-    const geçersizler = alici_kullanici_idleri.filter((id) => !gecerliIdSeti.has(id));
-    if (geçersizler.length > 0) {
-      return res.status(403).json({
-        hata_kodu: "YETKI_YOK",
-        mesaj: "Belirtilen alıcılardan bazıları kapsamınız dışında (farklı bir holdingde ya da pasif).",
-      });
-    }
-
-    await req.db.query("BEGIN");
-    const olusanlar = [];
-    for (const aliciId of alici_kullanici_idleri) {
-      const { rows } = await req.db.query(
-        `INSERT INTO mesaj (gonderen_kullanici_id, alici_kullanici_id, icerik)
-         VALUES ($1, $2, $3)
-         RETURNING mesaj_id`,
-        [req.user.kullanici_id, aliciId, icerik.trim()]
-      );
-      olusanlar.push(rows[0].mesaj_id);
-    }
-    await req.db.query("COMMIT");
-
-    res.status(201).json({
-      mesaj: `${olusanlar.length} kişiye mesaj gönderildi.`,
-      mesaj_idleri: olusanlar,
-    });
-  } catch (err) {
-    await req.db.query("ROLLBACK");
-    next(err);
   }
-});
 
-// POST /api/v1/mesajlar/:mesaj_id/okundu-isaretle — yalnızca mesajın ALICISI
-// tarafından çağrılabilir; gönderenin "giden kutusu"ndaki o mesajın altındaki
-// çizgiyi kırmızıdan yeşile döndürür.
-router.post("/:mesaj_id/okundu-isaretle", async (req, res, next) => {
-  try {
-    const { rows: mevcutRows } = await req.db.query(
-      `SELECT alici_kullanici_id, okundu_mu FROM mesaj WHERE mesaj_id = $1`,
-      [req.params.mesaj_id]
-    );
-    if (!mevcutRows[0]) {
-      return res.status(404).json({ hata_kodu: "MESAJ_BULUNAMADI", mesaj: "Mesaj bulunamadı." });
+  async function mesajiAc(mesaj) {
+    setAcikMesajId(acikMesajId === mesaj.mesaj_id ? null : mesaj.mesaj_id);
+    if (!mesaj.okundu_mu) {
+      try {
+        await istekAt(`/api/v1/mesajlar/${mesaj.mesaj_id}/okundu-isaretle`, { method: "POST" });
+        setGelenler((onceki) =>
+          onceki.map((m) => (m.mesaj_id === mesaj.mesaj_id ? { ...m, okundu_mu: true } : m))
+        );
+      } catch (err) {
+        // sessiz geç — okundu işareti önemli ama mesajı açmayı engellemesin
+      }
     }
-    if (mevcutRows[0].alici_kullanici_id !== req.user.kullanici_id) {
-      return res.status(403).json({ hata_kodu: "YETKI_YOK", mesaj: "Bu mesaj size ait değil." });
-    }
-
-    if (!mevcutRows[0].okundu_mu) {
-      await req.db.query(
-        `UPDATE mesaj SET okundu_mu = TRUE, okunma_tarihi = now() WHERE mesaj_id = $1`,
-        [req.params.mesaj_id]
-      );
-    }
-    res.json({ mesaj: "Okundu olarak işaretlendi." });
-  } catch (err) {
-    next(err);
   }
-});
 
-module.exports = router;
+  return (
+    <>
+      <Head>
+        <title>Mesajlar — HES CMMS</title>
+      </Head>
+      <div className="sayfa">
+        <UstBar />
+        <div className="icerik">
+          <div className="bolumBaslik">
+            <h2>Mesajlar</h2>
+            <button className="kucukButon" onClick={() => setFormuAcik((v) => !v)}>
+              {formuAcik ? "Vazgeç" : "+ Yeni Mesaj"}
+            </button>
+          </div>
+
+          {hata && <div className="hataKutusu">{hata}</div>}
+          {bilgi && <div className="basariliKutu">{bilgi}</div>}
+
+          {formuAcik && (
+            <form onSubmit={mesajGonder} className="yonetimFormu">
+              <div className="alan">
+                <label>Alıcılar</label>
+                <div style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
+                  <button type="button" className="linkButon" onClick={hepsiniSec}>
+                    Hepsini seç
+                  </button>
+                  <button type="button" className="linkButon" onClick={secimiTemizle}>
+                    Seçimi temizle
+                  </button>
+                </div>
+                <div className="aliciListesi">
+                  {alicilar &&
+                    alicilar.map((k) => (
+                      <label key={k.kullanici_id} className="aliciSatiri">
+                        <input
+                          type="checkbox"
+                          checked={seciliAlicilar.includes(k.kullanici_id)}
+                          onChange={() => aliciSecimiDegistir(k.kullanici_id)}
+                        />
+                        {k.ad_soyad} <span className="gorevAlt">({k.rol})</span>
+                      </label>
+                    ))}
+                </div>
+              </div>
+              <div className="alan">
+                <label>Mesaj</label>
+                <textarea
+                  required
+                  value={mesajIcerigi}
+                  onChange={(e) => setMesajIcerigi(e.target.value)}
+                  style={{ minHeight: "90px" }}
+                />
+              </div>
+              <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+                {gonderiliyor ? "Gönderiliyor…" : `Gönder (${seciliAlicilar.length} kişiye)`}
+              </button>
+            </form>
+          )}
+
+          <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+            <button
+              type="button"
+              className={sekme === "GELEN" ? "planSekmeAktif" : "planSekme"}
+              onClick={() => setSekme("GELEN")}
+            >
+              Gelen Kutusu {gelenler && `(${gelenler.filter((m) => !m.okundu_mu).length} okunmamış)`}
+            </button>
+            <button
+              type="button"
+              className={sekme === "GIDEN" ? "planSekmeAktif" : "planSekme"}
+              onClick={() => setSekme("GIDEN")}
+            >
+              Gönderilenler
+            </button>
+          </div>
+
+          {sekme === "GELEN" && (
+            <>
+              {!gelenler && <div className="yukleniyor">Yükleniyor…</div>}
+              {gelenler && gelenler.length === 0 && <div className="bosDurum">Gelen kutunuz boş.</div>}
+              {gelenler &&
+                gelenler.map((m) => (
+                  <div
+                    className={`mesajKarti ${!m.okundu_mu ? "mesajOkunmamis" : ""}`}
+                    key={m.mesaj_id}
+                    onClick={() => mesajiAc(m)}
+                  >
+                    <div className="mesajUst">
+                      <strong>{m.gonderen_adi}</strong>
+                      <span className="gorevAlt">{tarihSaatFormatla(m.gonderim_tarihi)}</span>
+                    </div>
+                    <div className={acikMesajId === m.mesaj_id ? "mesajIcerikAcik" : "mesajIcerikKapali"}>
+                      {m.icerik}
+                    </div>
+                    {acikMesajId === m.mesaj_id && (
+                      <button
+                        className="linkButon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          yanitla(m.gonderen_id);
+                        }}
+                      >
+                        Yanıtla
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </>
+          )}
+
+          {sekme === "GIDEN" && (
+            <>
+              {!gidenler && <div className="yukleniyor">Yükleniyor…</div>}
+              {gidenler && gidenler.length === 0 && <div className="bosDurum">Henüz mesaj göndermediniz.</div>}
+              {gidenler &&
+                gidenler.map((m) => (
+                  <div className="mesajKarti" key={m.mesaj_id}>
+                    <div className="mesajUst">
+                      <strong>{m.alici_adi}</strong>
+                      <span className="gorevAlt">{tarihSaatFormatla(m.gonderim_tarihi)}</span>
+                    </div>
+                    <div className="mesajIcerikAcik">{m.icerik}</div>
+                    <div className={`okunduCizgisi ${m.okundu_mu ? "okunduYesil" : "okunduKirmizi"}`}>
+                      {m.okundu_mu ? `✓ Okundu — ${tarihSaatFormatla(m.okunma_tarihi)}` : "Henüz okunmadı"}
+                    </div>
+                  </div>
+                ))}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
