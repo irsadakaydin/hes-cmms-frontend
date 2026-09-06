@@ -33,6 +33,7 @@ export default function SantralDetaySayfasi() {
   const [hata, setHata] = useState(null);
 
   const [ekipmanFormuAcik, setEkipmanFormuAcik] = useState(false);
+  const [ekipmanListesiAcik, setEkipmanListesiAcik] = useState(false);
   const [planFormuAcik, setPlanFormuAcik] = useState(false);
   const [planGorunumu, setPlanGorunumu] = useState("DEVAM_EDEN");
   const [gonderiliyor, setGonderiliyor] = useState(false);
@@ -380,7 +381,14 @@ export default function SantralDetaySayfasi() {
 
           {/* ---------- Ekipmanlar ---------- */}
           <div className="bolumBaslik">
-            <h2 style={{ fontSize: "17px" }}>Ekipmanlar</h2>
+            <button
+              type="button"
+              className="periyotGrupBasligi"
+              style={{ border: "none", padding: 0, background: "none", fontSize: "17px" }}
+              onClick={() => setEkipmanListesiAcik((v) => !v)}
+            >
+              {ekipmanListesiAcik ? "▾" : "▸"} Ekipmanlar {ekipmanlar ? `(${ekipmanlar.length})` : ""}
+            </button>
             <button className="kucukButon" onClick={() => setEkipmanFormuAcik((v) => !v)}>
               {ekipmanFormuAcik ? "Vazgeç" : "+ Yeni Ekipman"}
             </button>
@@ -435,10 +443,11 @@ export default function SantralDetaySayfasi() {
           )}
 
           {!ekipmanlar && <div className="yukleniyor">Yükleniyor…</div>}
-          {ekipmanlar && ekipmanlar.length === 0 && (
+          {ekipmanListesiAcik && ekipmanlar && ekipmanlar.length === 0 && (
             <div className="bosDurum">Bu santrale henüz ekipman eklenmemiş.</div>
           )}
-          {ekipmanlar &&
+          {ekipmanListesiAcik &&
+            ekipmanlar &&
             ekipmanlar.map((e) =>
               duzenlenenEkipman?.ekipman_id === e.ekipman_id ? (
                 <form onSubmit={ekipmaniGuncelle} className="yonetimFormu" key={e.ekipman_id}>
@@ -656,35 +665,45 @@ export default function SantralDetaySayfasi() {
           {!planlar && <div className="yukleniyor">Yükleniyor…</div>}
 
           {planlar && (
-            <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+            <div className="bakimSekmeSirasi">
               <button
                 type="button"
-                className={planGorunumu === "DEVAM_EDEN" ? "planSekmeAktif" : "planSekme"}
+                className={planGorunumu === "DEVAM_EDEN" ? "bakimSekmeAktif" : "bakimSekme"}
                 onClick={() => setPlanGorunumu("DEVAM_EDEN")}
               >
-                Devam Eden Bakımlar ({planlar.filter((p) => p.aktif_mi).length})
+                Devam Eden ({planlar.filter((p) => p.kategori === "DEVAM_EDEN").length})
               </button>
               <button
                 type="button"
-                className={planGorunumu === "DURDURULAN" ? "planSekmeAktif" : "planSekme"}
+                className={planGorunumu === "GECIKEN" ? "bakimSekmeAktif" : "bakimSekme"}
+                onClick={() => setPlanGorunumu("GECIKEN")}
+              >
+                Geciken ({planlar.filter((p) => p.kategori === "GECIKEN").length})
+              </button>
+              <button
+                type="button"
+                className={planGorunumu === "TAMAMLANAN" ? "bakimSekmeAktif" : "bakimSekme"}
+                onClick={() => setPlanGorunumu("TAMAMLANAN")}
+              >
+                Tamamlanan ({planlar.filter((p) => p.kategori === "TAMAMLANAN").length})
+              </button>
+              <button
+                type="button"
+                className={planGorunumu === "DURDURULAN" ? "bakimSekmeAktif" : "bakimSekme"}
                 onClick={() => setPlanGorunumu("DURDURULAN")}
               >
-                Durdurulan Bakımlar ({planlar.filter((p) => !p.aktif_mi).length})
+                Durdurulan ({planlar.filter((p) => p.kategori === "DURDURULAN").length})
               </button>
             </div>
           )}
 
-          {planlar && planlar.filter((p) => (planGorunumu === "DEVAM_EDEN" ? p.aktif_mi : !p.aktif_mi)).length === 0 && (
-            <div className="bosDurum">
-              {planGorunumu === "DEVAM_EDEN"
-                ? "Devam eden bir bakım planı yok."
-                : "Durdurulmuş bir bakım planı yok."}
-            </div>
+          {planlar && planlar.filter((p) => p.kategori === planGorunumu).length === 0 && (
+            <div className="bosDurum">Bu kategoride bir bakım planı yok.</div>
           )}
 
           {planlar &&
             planlar
-              .filter((p) => (planGorunumu === "DEVAM_EDEN" ? p.aktif_mi : !p.aktif_mi))
+              .filter((p) => p.kategori === planGorunumu)
               .map((p) => (
               <div className="satirKart" key={p.plan_id}>
                 <div>
