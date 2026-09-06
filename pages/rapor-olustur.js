@@ -51,6 +51,7 @@ function donemTarihAraligi(donem) {
 export default function RaporOlusturSayfasi() {
   const router = useRouter();
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
+  const [sekme, setSekme] = useState("OZET");
   const [santraller, setSantraller] = useState(null);
   const [holdingler, setHoldingler] = useState(null);
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
@@ -66,6 +67,14 @@ export default function RaporOlusturSayfasi() {
   const [donem, setDonem] = useState("TUM_ZAMANLAR");
   const [ozelBaslangic, setOzelBaslangic] = useState("");
   const [ozelBitis, setOzelBitis] = useState("");
+
+  // "PDF Çıktı Al" sekmesi — tek bir tamamlanmış görevin tam checklist
+  // formunu (soru+cevap, not, imza, fotoğraf) PDF olarak üretir.
+  const [ciktiSantralId, setCiktiSantralId] = useState("");
+  const [ciktiBaslangic, setCiktiBaslangic] = useState("");
+  const [ciktiBitis, setCiktiBitis] = useState("");
+  const [tamamlananGorevler, setTamamlananGorevler] = useState(null);
+  const [ciktiIndiriliyorId, setCiktiIndiriliyorId] = useState(null);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -130,6 +139,38 @@ export default function RaporOlusturSayfasi() {
     }
   }
 
+  async function tamamlananlariGetir() {
+    setHata(null);
+    if (!ciktiBaslangic || !ciktiBitis) {
+      setHata("Tarih aralığı için başlangıç ve bitiş tarihini seçmelisiniz.");
+      return;
+    }
+    try {
+      const p = new URLSearchParams({ baslangic: ciktiBaslangic, bitis: ciktiBitis });
+      if (ciktiSantralId) p.set("santral_id", ciktiSantralId);
+      else if (platformAdmin && seciliHoldingId) p.set("isletme_id", seciliHoldingId);
+      const sonuc = await istekAt(`/api/v1/raporlar/tamamlanan-gorevler?${p.toString()}`);
+      setTamamlananGorevler(sonuc.veri);
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function gorevPdfIndir(gorev) {
+    setCiktiIndiriliyorId(gorev.gorev_id);
+    setHata(null);
+    try {
+      await dosyaIndir(
+        `/api/v1/raporlar/gorev-detay-pdf/${gorev.gorev_id}`,
+        `${gorev.ekipman_adi} - ${gorev.bakim_adi}.pdf`
+      );
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setCiktiIndiriliyorId(null);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -142,10 +183,27 @@ export default function RaporOlusturSayfasi() {
             <h2>Rapor Oluştur</h2>
           </div>
 
+          <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+            <button
+              type="button"
+              className={sekme === "OZET" ? "planSekmeAktif" : "planSekme"}
+              onClick={() => setSekme("OZET")}
+            >
+              Özet Rapor
+            </button>
+            <button
+              type="button"
+              className={sekme === "PDF_CIKTI" ? "planSekmeAktif" : "planSekme"}
+              onClick={() => setSekme("PDF_CIKTI")}
+            >
+              PDF Çıktı Al
+            </button>
+          </div>
+
           {hata && <div className="hataKutusu">{hata}</div>}
           {!santraller && !hata && <div className="yukleniyor">Yükleniyor…</div>}
 
-          {santraller && (
+          {sekme === "OZET" && santraller && (
             <div className="yonetimFormu">
               {platformAdmin && (
                 <div className="alan">
@@ -254,6 +312,93 @@ export default function RaporOlusturSayfasi() {
                       {indiriliyor ? "Hazırlanıyor…" : "Excel Rapor Oluştur"}
                     </button>
                   </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {sekme === "PDF_CIKTI" && santraller && (
+            <div className="yonetimFormu">
+              {platformAdmin && (
+                <div className="alan">
+                  <label>Holding</label>
+                  <select
+                    value={seciliHoldingId}
+                    onChange={(e) => {
+                      setSeciliHoldingId(e.target.value);
+                      setCiktiSantralId("");
+                      setTamamlananGorevler(null);
+                    }}
+                  >
+                    <option value="">Bir holding seçin…</option>
+                    {holdingler &&
+                      holdingler.map((h) => (
+                        <option key={h.isletme_id} value={h.isletme_id}>
+                          {h.ad}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {(!platformAdmin || seciliHoldingId) && (
+                <>
+                  <div className="alan">
+                    <label>Santral</label>
+                    <select value={ciktiSantralId} onChange={(e) => setCiktiSantralId(e.target.value)}>
+                      <option value="">Tüm Santraller</option>
+                      {gosterilecekSantraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad} {!platformAdmin && s.isletme_adi ? `(${s.isletme_adi})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "12px" }}>
+                    <div className="alan" style={{ flex: 1 }}>
+                      <label>Başlangıç tarihi</label>
+                      <input
+                        type="date"
+                        value={ciktiBaslangic}
+                        onChange={(e) => setCiktiBaslangic(e.target.value)}
+                      />
+                    </div>
+                    <div className="alan" style={{ flex: 1 }}>
+                      <label>Bitiş tarihi</label>
+                      <input type="date" value={ciktiBitis} onChange={(e) => setCiktiBitis(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <button className="birincilButon" type="button" onClick={tamamlananlariGetir}>
+                    Tamamlanan Görevleri Listele
+                  </button>
+
+                  {tamamlananGorevler && tamamlananGorevler.length === 0 && (
+                    <div className="bosDurum" style={{ marginTop: "16px" }}>
+                      Seçilen tarih aralığında tamamlanmış görev yok.
+                    </div>
+                  )}
+
+                  {tamamlananGorevler &&
+                    tamamlananGorevler.map((g) => (
+                      <div className="satirKart" key={g.gorev_id} style={{ marginTop: "12px" }}>
+                        <div>
+                          <strong>{g.ekipman_adi}</strong> — {g.bakim_adi}
+                        </div>
+                        <div className="gorevAlt">
+                          {g.santral_adi} · Tamamlayan: {g.tamamlayan_adi} ·{" "}
+                          {new Date(g.tamamlanma_tarihi).toLocaleDateString("tr-TR")}
+                        </div>
+                        <button
+                          className="linkButon"
+                          onClick={() => gorevPdfIndir(g)}
+                          disabled={ciktiIndiriliyorId === g.gorev_id}
+                        >
+                          {ciktiIndiriliyorId === g.gorev_id ? "Hazırlanıyor…" : "PDF Çıktı Al"}
+                        </button>
+                      </div>
+                    ))}
                 </>
               )}
             </div>
