@@ -1,72 +1,195 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+import Head from "next/head";
+import Link from "next/link";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../../lib/api";
+import UstBar from "../../components/UstBar";
 
-const authRoutes = require("./routes/auth");
-const santralRoutes = require("./routes/santraller");
-const gorevRoutes = require("./routes/gorevler");
-const ekipmanRoutes = require("./routes/ekipmanlar");
-const bakimPlanRoutes = require("./routes/bakimPlanlari");
-const isletmeRoutes = require("./routes/isletmeler");
-const bakimSablonRoutes = require("./routes/bakimSablonlari");
-const kullaniciRoutes = require("./routes/kullanicilar");
-const bildirimRoutes = require("./routes/bildirimler");
-const raporRoutes = require("./routes/raporlar");
-const mesajRoutes = require("./routes/mesajlar");
+/** Santralleri isletme_adi'na göre gruplar; backend zaten holding adına
+ * göre alfabetik sıralı döndürdüğü için gruplar ve içindeki santraller
+ * de otomatik sıralı çıkar. */
+function holdinglereGoreGrupla(santraller) {
+  const gruplar = [];
+  const indeksler = {};
+  for (const s of santraller) {
+    if (!(s.isletme_id in indeksler)) {
+      indeksler[s.isletme_id] = gruplar.length;
+      gruplar.push({ isletme_id: s.isletme_id, isletme_adi: s.isletme_adi, santraller: [] });
+    }
+    gruplar[indeksler[s.isletme_id]].santraller.push(s);
+  }
+  return gruplar;
+}
 
-const app = express();
-// NOT: Şu an tüm kaynaklardan (origin) isteğe izin veriliyor — MVP/geliştirme
-// aşaması için pratik bir seçim. Frontend'iniz sabit bir alan adına
-// yerleştiğinde, bunu o alan adıyla sınırlamak isteyebilirsiniz:
-// app.use(cors({ origin: "https://sizin-frontend-adresiniz.vercel.app" }));
-app.use(cors());
-app.use(express.json());
+function bosForm() {
+  return { isletme_id: "", ad: "", konum: "", kurulu_guc_mw: "", turbin_tipi: "" };
+}
 
-// Basit sağlık kontrolü — deploy sonrası hızlı doğrulama için
-app.get("/health", (req, res) => res.json({ durum: "ayakta" }));
+export default function SantrallerSayfasi() {
+  const router = useRouter();
+  const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/santraller", santralRoutes);
-app.use("/api/v1/gorevler", gorevRoutes);
-app.use("/api/v1/isletmeler", isletmeRoutes);
-app.use("/api/v1/bakim-sablonlari", bakimSablonRoutes);
-app.use("/api/v1/raporlar", raporRoutes);
-app.use("/api/v1/mesajlar", mesajRoutes);
-// Bunlar /santraller/:id/... ve /kullanicilar/:id, /isletmeler/:id/kullanicilar,
-// /gorevler/:id/bildirimler gibi birden fazla kök yolu aynı router içinde
-// tanımladığı için /api/v1 köküne bağlanır.
-app.use("/api/v1", ekipmanRoutes);
-app.use("/api/v1", bakimPlanRoutes);
-app.use("/api/v1", kullaniciRoutes);
-app.use("/api/v1", bildirimRoutes);
+  const [santraller, setSantraller] = useState(null);
+  const [holdingler, setHoldingler] = useState(null);
+  const [hata, setHata] = useState(null);
+  const [bilgi, setBilgi] = useState(null);
+  const [formuAcik, setFormuAcik] = useState(false);
+  const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [taslak, setTaslak] = useState(bosForm());
 
-// 404 — tanımsız rota
-app.use((req, res) => {
-  res.status(404).json({ hata_kodu: "ROTA_BULUNAMADI", mesaj: "İstenen uç nokta bulunamadı." });
-});
+  const verileriYukle = useCallback(async () => {
+    try {
+      const istekler = [istekAt("/api/v1/santraller")];
+      if (platformAdmin) istekler.push(istekAt("/api/v1/isletmeler"));
+      const sonuclar = await Promise.all(istekler);
+      setSantraller(sonuclar[0].veri);
+      if (platformAdmin) setHoldingler(sonuclar[1].veri);
+    } catch (err) {
+      setHata(err.message);
+    }
+  }, [platformAdmin]);
 
-// Merkezi hata yakalayıcı — her route'taki next(err) buraya düşer
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({
-    hata_kodu: "SUNUCU_HATASI",
-    mesaj: "Beklenmeyen bir hata oluştu.",
-  });
-});
+  useEffect(() => {
+    if (!tokenAl()) {
+      router.replace("/");
+      return;
+    }
+    if (!yoneticiMi()) {
+      router.replace("/gorevler");
+      return;
+    }
+    verileriYukle();
+  }, [verileriYukle, router]);
 
-// Güvenlik ağı: beklenmedik/yakalanmamış bir hata tüm sunucuyu çökertip
-// sistemin geri kalanını (görev tamamlama, giriş, vb.) etkilemesin diye —
-// hatayı logla, süreci KAPATMA. Render'ın kendi otomatik yeniden başlatma
-// mekanizmasına (gerçek bir çökme durumunda) güvenmeye devam ediyoruz,
-// ama tek bir isteğin hatası artık herkesi etkilemeyecek.
-process.on("uncaughtException", (err) => {
-  console.error("Yakalanmamış hata (süreç devam ediyor):", err);
-});
-process.on("unhandledRejection", (err) => {
-  console.error("Yakalanmamış promise reddi (süreç devam ediyor):", err);
-});
+  async function santralEkle(e) {
+    e.preventDefault();
+    setHata(null);
+    setBilgi(null);
+    setGonderiliyor(true);
+    try {
+      await istekAt("/api/v1/santraller", {
+        method: "POST",
+        body: JSON.stringify({
+          ...taslak,
+          kurulu_guc_mw: taslak.kurulu_guc_mw || undefined,
+        }),
+      });
+      setBilgi("Santral oluşturuldu.");
+      setTaslak(bosForm());
+      setFormuAcik(false);
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setGonderiliyor(false);
+    }
+  }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`HES CMMS API — http://localhost:${PORT} üzerinde çalışıyor`);
-});
+  const gruplar = santraller ? holdinglereGoreGrupla(santraller) : null;
+
+  return (
+    <>
+      <Head>
+        <title>Santraller — HES CMMS</title>
+      </Head>
+      <div className="sayfa">
+        <UstBar />
+        <div className="icerik">
+          <div className="bolumBaslik">
+            <h2>Santraller</h2>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {santraller && <span className="sayac">{santraller.length} santral</span>}
+              {platformAdmin && (
+                <button className="kucukButon" onClick={() => setFormuAcik((v) => !v)}>
+                  {formuAcik ? "Vazgeç" : "+ Yeni Santral"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {hata && <div className="hataKutusu">{hata}</div>}
+          {bilgi && <div className="basariliKutu">{bilgi}</div>}
+
+          {formuAcik && (
+            <form onSubmit={santralEkle} className="yonetimFormu">
+              <div className="alan">
+                <label>Holding</label>
+                <select
+                  required
+                  value={taslak.isletme_id}
+                  onChange={(e) => setTaslak({ ...taslak, isletme_id: e.target.value })}
+                >
+                  <option value="">Seçin…</option>
+                  {holdingler &&
+                    holdingler.map((h) => (
+                      <option key={h.isletme_id} value={h.isletme_id}>
+                        {h.ad}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="alan">
+                <label>Santral adı</label>
+                <input
+                  required
+                  value={taslak.ad}
+                  onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
+                  placeholder="Ör. Adıgüzel HES"
+                />
+              </div>
+              <div className="alan">
+                <label>Konum (isteğe bağlı)</label>
+                <input value={taslak.konum} onChange={(e) => setTaslak({ ...taslak, konum: e.target.value })} />
+              </div>
+              <div className="alan">
+                <label>Kurulu güç MW (isteğe bağlı)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={taslak.kurulu_guc_mw}
+                  onChange={(e) => setTaslak({ ...taslak, kurulu_guc_mw: e.target.value })}
+                />
+              </div>
+              <div className="alan">
+                <label>Türbin tipi (isteğe bağlı)</label>
+                <input
+                  value={taslak.turbin_tipi}
+                  onChange={(e) => setTaslak({ ...taslak, turbin_tipi: e.target.value })}
+                  placeholder="Ör. Francis"
+                />
+              </div>
+              <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+                {gonderiliyor ? "Oluşturuluyor…" : "Santralı Oluştur"}
+              </button>
+            </form>
+          )}
+
+          {!santraller && !hata && <div className="yukleniyor">Yükleniyor…</div>}
+
+          {gruplar &&
+            gruplar.map((g) => (
+              <div key={g.isletme_id} style={{ marginBottom: "28px" }}>
+                <h3 className="holdingBasligi">{g.isletme_adi}</h3>
+                {g.santraller.map((s) => (
+                  <Link key={s.santral_id} href={`/santraller/${s.santral_id}`} className="santralKart">
+                    <div className="gorevSantral">
+                      {s.ad}
+                      {s.durum !== "AKTIF" && (
+                        <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
+                          {s.durum === "DEVRE_DISI" ? "Pasif" : s.durum}
+                        </span>
+                      )}
+                    </div>
+                    <div className="gorevAlt">
+                      {s.konum} {s.turbin_tipi ? `— ${s.turbin_tipi}` : ""}{" "}
+                      {s.kurulu_guc_mw ? `— ${s.kurulu_guc_mw} MW` : ""}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ))}
+        </div>
+      </div>
+    </>
+  );
+}
