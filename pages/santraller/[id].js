@@ -33,7 +33,7 @@ export default function SantralDetaySayfasi() {
   const [santral, setSantral] = useState(null);
   const [ekipmanlar, setEkipmanlar] = useState(null);
   const [planlar, setPlanlar] = useState(null);
-  const [sablonlar, setSablonlar] = useState(null);
+  const [tumSablonlar, setTumSablonlar] = useState(null);
   const [hata, setHata] = useState(null);
 
   const [ekipmanFormuAcik, setEkipmanFormuAcik] = useState(false);
@@ -74,7 +74,7 @@ export default function SantralDetaySayfasi() {
       setSantral(s);
       setEkipmanlar(e.veri);
       setPlanlar(p.veri);
-      setSablonlar(sb.veri);
+      setTumSablonlar(sb.veri);
     } catch (err) {
       setHata(err.message);
     }
@@ -307,6 +307,14 @@ export default function SantralDetaySayfasi() {
       </div>
     );
   }
+
+  // Seçilen ekipmanın tipi VE seçilen periyoda göre şablon listesini anlık süzer
+  const yeniPlanSeciliEkipman = (ekipmanlar || []).find((ek) => ek.ekipman_id === yeniPlan.ekipman_id);
+  const sabitliSablonlar = (tumSablonlar || []).filter((sb) => {
+    if (yeniPlanSeciliEkipman && sb.ekipman_tipi !== yeniPlanSeciliEkipman.tip) return false;
+    if (yeniPlan.periyot && sb.periyot_tipi !== yeniPlan.periyot) return false;
+    return true;
+  });
 
   return (
     <>
@@ -597,7 +605,7 @@ export default function SantralDetaySayfasi() {
                 <select
                   required
                   value={yeniPlan.ekipman_id}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, ekipman_id: e.target.value })}
+                  onChange={(e) => setYeniPlan({ ...yeniPlan, ekipman_id: e.target.value, sablon_id: "" })}
                 >
                   <option value="">Seçin…</option>
                   {ekipmanlar &&
@@ -609,37 +617,10 @@ export default function SantralDetaySayfasi() {
                 </select>
               </div>
               <div className="alan">
-                <label>
-                  Bakım şablonu <span className="kutuphaneEtiketi">— {santral.isletme_adi} Kütüphanesi</span>
-                </label>
-                <select
-                  required
-                  value={yeniPlan.sablon_id}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, sablon_id: e.target.value })}
-                >
-                  <option value="">Seçin…</option>
-                  {sablonlar && sablonlar.length > 0 && (
-                    <optgroup label={`${santral.isletme_adi} Kütüphanesi`}>
-                      {sablonlar.map((s) => (
-                        <option key={s.sablon_id} value={s.sablon_id}>
-                          {s.ad} ({s.ekipman_tipi})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                {sablonlar && sablonlar.length === 0 && (
-                  <div className="kutuphaneBosUyari">
-                    {santral.isletme_adi} kütüphanesinde henüz bakım şablonu yok —{" "}
-                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından ekleyin.
-                  </div>
-                )}
-              </div>
-              <div className="alan">
                 <label>Periyot</label>
                 <select
                   value={yeniPlan.periyot}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, periyot: e.target.value })}
+                  onChange={(e) => setYeniPlan({ ...yeniPlan, periyot: e.target.value, sablon_id: "" })}
                 >
                   {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
                     <option key={deger} value={deger}>
@@ -647,6 +628,30 @@ export default function SantralDetaySayfasi() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="alan">
+                <label>
+                  Bakım şablonu — seçilen ekipman ve periyoda göre süzülür{" "}
+                  <span className="kutuphaneEtiketi">— {santral.isletme_adi} Kütüphanesi</span>
+                </label>
+                <select
+                  required
+                  value={yeniPlan.sablon_id}
+                  onChange={(e) => setYeniPlan({ ...yeniPlan, sablon_id: e.target.value })}
+                >
+                  <option value="">Seçin…</option>
+                  {sabitliSablonlar.map((s) => (
+                    <option key={s.sablon_id} value={s.sablon_id}>
+                      {s.ad} ({s.ekipman_tipi})
+                    </option>
+                  ))}
+                </select>
+                {yeniPlan.ekipman_id && sabitliSablonlar.length === 0 && (
+                  <div className="kutuphaneBosUyari">
+                    Bu ekipman tipi + periyot için {santral.isletme_adi} kütüphanesinde henüz bir şablon yok —{" "}
+                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından ekleyin.
+                  </div>
+                )}
               </div>
               <div className="alan">
                 <label>Başlangıç tarihi</label>
