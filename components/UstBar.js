@@ -24,8 +24,10 @@ export default function UstBar() {
           <Link href="/gorevler">Görevlerim</Link>
           {platformAdmin && <Link href="/holdingler">Holdingler</Link>}
           {yonetici && <Link href="/santraller">Santraller</Link>}
+          {yonetici && <Link href="/ekipman-olustur">Ekipman Oluştur</Link>}
+          {yonetici && <Link href="/bakim-plani-olustur">Bakım Planı Oluştur</Link>}
+          {yonetici && <Link href="/sablonlar">Bakım Şablonları</Link>}
           {yonetici && <Link href="/rapor-olustur">Rapor Oluştur</Link>}
-          {isletmeYoneticisi && <Link href="/sablonlar">Bakım Şablonları</Link>}
           {isletmeYoneticisi && <Link href="/kullanicilar">Kullanıcılar</Link>}
         </nav>
       </div>
