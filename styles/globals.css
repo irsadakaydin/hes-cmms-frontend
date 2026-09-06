@@ -819,6 +819,25 @@ h1, h2, h3 {
   background: var(--amber-soft);
 }
 
+.mesajlarLinki {
+  position: relative;
+}
+
+.okunmamisIsareti {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  color: var(--amber);
+  font-size: 13px;
+  animation: yaniPistek 1.8s ease-in-out infinite;
+}
+
+@keyframes yaniPistek {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ---------- Mesajlar ---------- */
 
 .aliciListesi {
@@ -834,13 +853,18 @@ h1, h2, h3 {
   align-items: center;
   gap: 8px;
   font-size: 13px;
+  line-height: 18px;
   padding: 4px 0;
   cursor: pointer;
 }
 
 .aliciSatiri input[type="checkbox"] {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   margin: 0;
+  padding: 0;
+  vertical-align: middle;
 }
 
 .mesajKarti {
