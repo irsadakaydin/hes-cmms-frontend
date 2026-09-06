@@ -44,7 +44,7 @@ export default function SantralDetaySayfasi() {
     sablon_id: "",
     periyot: "AYLIK",
     baslangic_tarihi: "",
-    sorumlu_kullanici_id: "",
+    sorumlu_kullanici_idleri: [],
   });
   const [atanabilirKullanicilar, setAtanabilirKullanicilar] = useState(null);
   const [santralDuzenleAcik, setSantralDuzenleAcik] = useState(false);
@@ -140,13 +140,17 @@ export default function SantralDetaySayfasi() {
   async function planEkle(e) {
     e.preventDefault();
     setHata(null);
+    if (yeniPlan.sorumlu_kullanici_idleri.length === 0) {
+      setHata("En az bir sorumlu kullanıcı seçmelisiniz.");
+      return;
+    }
     setGonderiliyor(true);
     try {
       await istekAt(`/api/v1/santraller/${id}/bakim-planlari`, {
         method: "POST",
         body: JSON.stringify(yeniPlan),
       });
-      setYeniPlan({ ekipman_id: "", sablon_id: "", periyot: "AYLIK", baslangic_tarihi: "", sorumlu_kullanici_id: "" });
+      setYeniPlan({ ekipman_id: "", sablon_id: "", periyot: "AYLIK", baslangic_tarihi: "", sorumlu_kullanici_idleri: [] });
       setPlanFormuAcik(false);
       await verileriYukle();
     } catch (err) {
@@ -243,13 +247,29 @@ export default function SantralDetaySayfasi() {
     }
   }
 
-  async function planSorumlusunuDegistir(planId, yeniSorumluId) {
-    if (!yeniSorumluId) return;
+  async function planaSorumluEkle(plan, yeniKullaniciId) {
+    if (!yeniKullaniciId) return;
     setHata(null);
     try {
-      await istekAt(`/api/v1/bakim-planlari/${planId}`, {
+      const mevcutIdler = (plan.sorumlular || []).map((s) => s.kullanici_id);
+      if (mevcutIdler.includes(yeniKullaniciId)) return;
+      await istekAt(`/api/v1/bakim-planlari/${plan.plan_id}`, {
         method: "PATCH",
-        body: JSON.stringify({ sorumlu_kullanici_id: yeniSorumluId }),
+        body: JSON.stringify({ sorumlu_kullanici_idleri: [...mevcutIdler, yeniKullaniciId] }),
+      });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function planSorumlusunuKaldir(plan, kaldirilacakId) {
+    setHata(null);
+    try {
+      const kalanIdler = (plan.sorumlular || []).map((s) => s.kullanici_id).filter((id) => id !== kaldirilacakId);
+      await istekAt(`/api/v1/bakim-planlari/${plan.plan_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sorumlu_kullanici_idleri: kalanIdler }),
       });
       await verileriYukle();
     } catch (err) {
@@ -583,20 +603,27 @@ export default function SantralDetaySayfasi() {
                 />
               </div>
               <div className="alan">
-                <label>Sorumlu kullanıcı (görevler kime atansın)</label>
-                <select
-                  required
-                  value={yeniPlan.sorumlu_kullanici_id}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, sorumlu_kullanici_id: e.target.value })}
-                >
-                  <option value="">Seçin…</option>
+                <label>Sorumlu kullanıcı(lar) — birden fazla seçebilirsiniz</label>
+                <div className="aliciListesi">
                   {atanabilirKullanicilar &&
                     atanabilirKullanicilar.map((k) => (
-                      <option key={k.kullanici_id} value={k.kullanici_id}>
+                      <label key={k.kullanici_id} className="aliciSatiri">
+                        <input
+                          type="checkbox"
+                          checked={yeniPlan.sorumlu_kullanici_idleri.includes(k.kullanici_id)}
+                          onChange={() =>
+                            setYeniPlan((t) => ({
+                              ...t,
+                              sorumlu_kullanici_idleri: t.sorumlu_kullanici_idleri.includes(k.kullanici_id)
+                                ? t.sorumlu_kullanici_idleri.filter((id) => id !== k.kullanici_id)
+                                : [...t.sorumlu_kullanici_idleri, k.kullanici_id],
+                            }))
+                          }
+                        />
                         {k.ad_soyad} ({ROL_KISA_ETIKET[k.rol] || k.rol})
-                      </option>
+                      </label>
                     ))}
-                </select>
+                </div>
                 {atanabilirKullanicilar && atanabilirKullanicilar.length === 0 && (
                   <div className="kutuphaneBosUyari">
                     Bu santrale erişimi olan bir kullanıcı yok — önce Kullanıcılar sayfasından birine bu
@@ -650,21 +677,32 @@ export default function SantralDetaySayfasi() {
                 <div className="gorevAlt">
                   {PERIYOT_ETIKETLERI[p.periyot] || p.periyot} · Başlangıç:{" "}
                   {new Date(p.baslangic_tarihi).toLocaleDateString("tr-TR")}
-                  {p.sorumlu_ad_soyad && ` · Sorumlu: ${p.sorumlu_ad_soyad}`}
                   {!p.aktif_mi && " · DURDURULDU"}
                 </div>
+                {p.sorumlular && p.sorumlular.length > 0 && (
+                  <div className="santralEtiketleri" style={{ marginTop: "6px" }}>
+                    {p.sorumlular.map((s) => (
+                      <span key={s.kullanici_id} className="santralEtiket">
+                        {s.ad_soyad}
+                        {p.aktif_mi && (
+                          <button onClick={() => planSorumlusunuKaldir(p, s.kullanici_id)}>×</button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {p.aktif_mi && (
                   <>
                     <select
                       defaultValue=""
-                      style={{ marginRight: "10px", fontSize: "12px", padding: "4px" }}
+                      style={{ marginRight: "10px", fontSize: "12px", padding: "4px", marginTop: "8px" }}
                       onChange={(e) => {
-                        planSorumlusunuDegistir(p.plan_id, e.target.value);
+                        planaSorumluEkle(p, e.target.value);
                         e.target.value = "";
                       }}
                     >
                       <option value="" disabled>
-                        Sorumluyu değiştir…
+                        + Sorumlu ekle…
                       </option>
                       {atanabilirKullanicilar &&
                         atanabilirKullanicilar.map((k) => (
