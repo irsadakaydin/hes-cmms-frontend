@@ -662,6 +662,108 @@ h1, h2, h3 {
   margin-bottom: 12px;
 }
 
+/* ---------- 2. Banner (özet daireleri) ---------- */
+
+.ozetBanner {
+  display: flex;
+  gap: 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 24px;
+  align-items: flex-start;
+  overflow-x: auto;
+}
+
+.ozetBannerSol {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.ozetBannerSol label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.ozetBannerSol select {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 13px;
+}
+
+.ozetBannerTarihler {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ozetBannerTarihler input {
+  padding: 5px 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 12px;
+}
+
+.ozetBannerSag {
+  display: flex;
+  gap: 32px;
+  overflow-x: auto;
+}
+
+.ozetSantralGrubu {
+  flex-shrink: 0;
+}
+
+.ozetSantralAdi {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal-deep);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.ozetDaireSira {
+  display: flex;
+  gap: 14px;
+}
+
+.ozetDaireKutu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ozetDaire {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.ozetDaire:hover {
+  transform: scale(1.06);
+}
+
+.ozetDaireEtiket {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+  white-space: nowrap;
+}
+
 .kucukButon {
   background: var(--teal);
   color: #fff;
