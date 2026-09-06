@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi } from "../lib/api";
+import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi, istekAt, tokenAl } from "../lib/api";
 
 export default function UstBar() {
   const router = useRouter();
@@ -8,6 +9,14 @@ export default function UstBar() {
   const yonetici = typeof window !== "undefined" ? yoneticiMi() : false;
   const isletmeYoneticisi = typeof window !== "undefined" ? isletmeYoneticisiMi() : false;
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
+  const [okunmamisSayi, setOkunmamisSayi] = useState(0);
+
+  useEffect(() => {
+    if (!tokenAl()) return;
+    istekAt("/api/v1/mesajlar/okunmamis-sayisi")
+      .then((veri) => setOkunmamisSayi(veri.sayi))
+      .catch(() => {});
+  }, []);
 
   function cikis() {
     cikisYap();
@@ -22,7 +31,10 @@ export default function UstBar() {
         </div>
         <nav className="ustBarNav">
           <Link href="/gorevler">Görevlerim</Link>
-          <Link href="/mesajlar">Mesajlar</Link>
+          <Link href="/mesajlar" className="mesajlarLinki">
+            Mesajlar
+            {okunmamisSayi > 0 && <span className="okunmamisIsareti">✉</span>}
+          </Link>
           {platformAdmin && <Link href="/holdingler">Holdingler</Link>}
           {yonetici && <Link href="/santraller">Santraller</Link>}
           {yonetici && <Link href="/ekipman-olustur">Ekipman Oluştur</Link>}
