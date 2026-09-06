@@ -5,7 +5,7 @@ import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 function bosForm() {
-  return { santral_id: "", ad: "", tip: "", seri_no: "", uretici: "", kurulum_tarihi: "", konum_notu: "" };
+  return { santral_id: "", ad: "", tip: "", unite_no: "", seri_no: "", uretici: "", kurulum_tarihi: "", konum_notu: "" };
 }
 
 export default function EkipmanOlusturSayfasi() {
@@ -120,6 +120,14 @@ export default function EkipmanOlusturSayfasi() {
                           </option>
                         ))}
                     </select>
+                  </div>
+                  <div className="alan">
+                    <label>Ünite No (isteğe bağlı)</label>
+                    <input
+                      value={taslak.unite_no}
+                      onChange={(e) => setTaslak({ ...taslak, unite_no: e.target.value })}
+                      placeholder="Ör. Ünite 1"
+                    />
                   </div>
                   <div className="alan">
                     <label>Ekipman adı</label>

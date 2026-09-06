@@ -63,7 +63,7 @@ export default function EkipmanListesiSayfasi() {
 
   function duzenlemeyiBaslat(e) {
     setDuzenlenenId(e.ekipman_id);
-    setTaslak({ ad: e.ad, tip: e.tip, seri_no: e.seri_no || "", uretici: e.uretici || "" });
+    setTaslak({ ad: e.ad, tip: e.tip, unite_no: e.unite_no || "", seri_no: e.seri_no || "", uretici: e.uretici || "" });
   }
 
   async function duzenlemeyiKaydet(ekipmanId) {
@@ -180,6 +180,13 @@ export default function EkipmanListesiSayfasi() {
                     <input value={taslak.ad} onChange={(ev) => setTaslak({ ...taslak, ad: ev.target.value })} />
                   </div>
                   <div className="alan">
+                    <label>Ünite No</label>
+                    <input
+                      value={taslak.unite_no || ""}
+                      onChange={(ev) => setTaslak({ ...taslak, unite_no: ev.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
                     <label>Tip</label>
                     <input value={taslak.tip} onChange={(ev) => setTaslak({ ...taslak, tip: ev.target.value })} />
                   </div>
@@ -218,6 +225,7 @@ export default function EkipmanListesiSayfasi() {
                 <div className="satirKart" key={e.ekipman_id}>
                   <div>
                     <strong>{e.ad}</strong> — {e.tip}
+                    {e.unite_no && ` (${e.unite_no})`}
                     {e.durum === "HURDA" && (
                       <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
                         Pasif
