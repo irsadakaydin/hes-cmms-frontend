@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, yoneticiMi } from "../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -20,13 +20,17 @@ function bosForm() {
     sablon_id: "",
     periyot: "AYLIK",
     baslangic_tarihi: "",
-    sorumlu_kullanici_id: "",
+    sorumlu_kullanici_idleri: [],
   };
 }
 
 export default function BakimPlaniOlusturSayfasi() {
   const router = useRouter();
+  const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
+
   const [santraller, setSantraller] = useState(null);
+  const [holdingler, setHoldingler] = useState(null);
+  const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [ekipmanlar, setEkipmanlar] = useState(null);
   const [sablonlar, setSablonlar] = useState(null);
   const [atanabilirKullanicilar, setAtanabilirKullanicilar] = useState(null);
@@ -44,14 +48,19 @@ export default function BakimPlaniOlusturSayfasi() {
       router.replace("/gorevler");
       return;
     }
-    istekAt("/api/v1/santraller")
-      .then((veri) => setSantraller(veri.veri))
+    const istekler = [istekAt("/api/v1/santraller")];
+    if (platformAdminMi()) istekler.push(istekAt("/api/v1/isletmeler"));
+    Promise.all(istekler)
+      .then(([s, h]) => {
+        setSantraller(s.veri);
+        if (h) setHoldingler(h.veri);
+      })
       .catch((err) => setHata(err.message));
   }, [router]);
 
   const santralSecildi = useCallback(
     async (santral_id) => {
-      setTaslak((t) => ({ ...t, santral_id, ekipman_id: "", sablon_id: "", sorumlu_kullanici_id: "" }));
+      setTaslak((t) => ({ ...bosForm(), santral_id }));
       setEkipmanlar(null);
       setSablonlar(null);
       setAtanabilirKullanicilar(null);
@@ -74,10 +83,23 @@ export default function BakimPlaniOlusturSayfasi() {
     [santraller]
   );
 
+  function sorumluSecimiDegistir(kullaniciId) {
+    setTaslak((t) => ({
+      ...t,
+      sorumlu_kullanici_idleri: t.sorumlu_kullanici_idleri.includes(kullaniciId)
+        ? t.sorumlu_kullanici_idleri.filter((id) => id !== kullaniciId)
+        : [...t.sorumlu_kullanici_idleri, kullaniciId],
+    }));
+  }
+
   async function planEkle(e) {
     e.preventDefault();
     setHata(null);
     setBilgi(null);
+    if (taslak.sorumlu_kullanici_idleri.length === 0) {
+      setHata("En az bir sorumlu kullanıcı seçmelisiniz.");
+      return;
+    }
     setGonderiliyor(true);
     try {
       const { santral_id, ...gonderilecek } = taslak;
@@ -93,6 +115,10 @@ export default function BakimPlaniOlusturSayfasi() {
       setGonderiliyor(false);
     }
   }
+
+  const gosterilecekSantraller = platformAdmin
+    ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
+    : santraller;
 
   return (
     <>
@@ -112,21 +138,42 @@ export default function BakimPlaniOlusturSayfasi() {
 
           {santraller && (
             <form onSubmit={planEkle} className="yonetimFormu">
-              <div className="alan">
-                <label>Santral</label>
-                <select
-                  required
-                  value={taslak.santral_id}
-                  onChange={(e) => santralSecildi(e.target.value)}
-                >
-                  <option value="">Seçin…</option>
-                  {santraller.map((s) => (
-                    <option key={s.santral_id} value={s.santral_id}>
-                      {s.ad} {s.isletme_adi ? `(${s.isletme_adi})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {platformAdmin && (
+                <div className="alan">
+                  <label>Holding</label>
+                  <select
+                    required
+                    value={seciliHoldingId}
+                    onChange={(e) => {
+                      setSeciliHoldingId(e.target.value);
+                      santralSecildi("");
+                    }}
+                  >
+                    <option value="">Seçin…</option>
+                    {holdingler &&
+                      holdingler.map((h) => (
+                        <option key={h.isletme_id} value={h.isletme_id}>
+                          {h.ad}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {(!platformAdmin || seciliHoldingId) && (
+                <div className="alan">
+                  <label>Santral</label>
+                  <select required value={taslak.santral_id} onChange={(e) => santralSecildi(e.target.value)}>
+                    <option value="">Seçin…</option>
+                    {gosterilecekSantraller &&
+                      gosterilecekSantraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad} {s.isletme_adi ? `(${s.isletme_adi})` : ""}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
 
               {taslak.santral_id && (
                 <>
@@ -178,10 +225,7 @@ export default function BakimPlaniOlusturSayfasi() {
 
                   <div className="alan">
                     <label>Periyot</label>
-                    <select
-                      value={taslak.periyot}
-                      onChange={(e) => setTaslak({ ...taslak, periyot: e.target.value })}
-                    >
+                    <select value={taslak.periyot} onChange={(e) => setTaslak({ ...taslak, periyot: e.target.value })}>
                       {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
                         <option key={deger} value={deger}>
                           {etiket}
@@ -201,20 +245,20 @@ export default function BakimPlaniOlusturSayfasi() {
                   </div>
 
                   <div className="alan">
-                    <label>Sorumlu kullanıcı (görevler kime atansın)</label>
-                    <select
-                      required
-                      value={taslak.sorumlu_kullanici_id}
-                      onChange={(e) => setTaslak({ ...taslak, sorumlu_kullanici_id: e.target.value })}
-                    >
-                      <option value="">Seçin…</option>
+                    <label>Sorumlu kullanıcı(lar) — birden fazla seçebilirsiniz</label>
+                    <div className="aliciListesi">
                       {atanabilirKullanicilar &&
                         atanabilirKullanicilar.map((k) => (
-                          <option key={k.kullanici_id} value={k.kullanici_id}>
+                          <label key={k.kullanici_id} className="aliciSatiri">
+                            <input
+                              type="checkbox"
+                              checked={taslak.sorumlu_kullanici_idleri.includes(k.kullanici_id)}
+                              onChange={() => sorumluSecimiDegistir(k.kullanici_id)}
+                            />
                             {k.ad_soyad}
-                          </option>
+                          </label>
                         ))}
-                    </select>
+                    </div>
                   </div>
 
                   <button className="birincilButon" type="submit" disabled={gonderiliyor}>

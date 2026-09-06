@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, yoneticiMi } from "../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 function bosForm() {
@@ -10,7 +10,11 @@ function bosForm() {
 
 export default function EkipmanOlusturSayfasi() {
   const router = useRouter();
+  const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
+
   const [santraller, setSantraller] = useState(null);
+  const [holdingler, setHoldingler] = useState(null);
+  const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
   const [gonderiliyor, setGonderiliyor] = useState(false);
@@ -25,8 +29,13 @@ export default function EkipmanOlusturSayfasi() {
       router.replace("/gorevler");
       return;
     }
-    istekAt("/api/v1/santraller")
-      .then((veri) => setSantraller(veri.veri))
+    const istekler = [istekAt("/api/v1/santraller")];
+    if (platformAdminMi()) istekler.push(istekAt("/api/v1/isletmeler"));
+    Promise.all(istekler)
+      .then(([s, h]) => {
+        setSantraller(s.veri);
+        if (h) setHoldingler(h.veri);
+      })
       .catch((err) => setHata(err.message));
   }, [router]);
 
@@ -50,6 +59,10 @@ export default function EkipmanOlusturSayfasi() {
     }
   }
 
+  const gosterilecekSantraller = platformAdmin
+    ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
+    : santraller;
+
   return (
     <>
       <Head>
@@ -68,72 +81,93 @@ export default function EkipmanOlusturSayfasi() {
 
           {santraller && (
             <form onSubmit={ekipmanEkle} className="yonetimFormu">
-              <div className="alan">
-                <label>Santral</label>
-                <select
-                  required
-                  value={taslak.santral_id}
-                  onChange={(e) => setTaslak({ ...taslak, santral_id: e.target.value })}
-                >
-                  <option value="">Seçin…</option>
-                  {santraller.map((s) => (
-                    <option key={s.santral_id} value={s.santral_id}>
-                      {s.ad} {s.isletme_adi ? `(${s.isletme_adi})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="alan">
-                <label>Ekipman adı</label>
-                <input
-                  required
-                  value={taslak.ad}
-                  onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
-                  placeholder="Ör. Türbin 2"
-                />
-              </div>
-              <div className="alan">
-                <label>Tip</label>
-                <input
-                  required
-                  value={taslak.tip}
-                  onChange={(e) => setTaslak({ ...taslak, tip: e.target.value })}
-                  placeholder="Ör. Francis Türbin"
-                />
-              </div>
-              <div className="alan">
-                <label>Seri no (isteğe bağlı)</label>
-                <input
-                  value={taslak.seri_no}
-                  onChange={(e) => setTaslak({ ...taslak, seri_no: e.target.value })}
-                />
-              </div>
-              <div className="alan">
-                <label>Üretici (isteğe bağlı)</label>
-                <input
-                  value={taslak.uretici}
-                  onChange={(e) => setTaslak({ ...taslak, uretici: e.target.value })}
-                />
-              </div>
-              <div className="alan">
-                <label>Kurulum tarihi (isteğe bağlı)</label>
-                <input
-                  type="date"
-                  value={taslak.kurulum_tarihi}
-                  onChange={(e) => setTaslak({ ...taslak, kurulum_tarihi: e.target.value })}
-                />
-              </div>
-              <div className="alan">
-                <label>Konum notu (isteğe bağlı)</label>
-                <input
-                  value={taslak.konum_notu}
-                  onChange={(e) => setTaslak({ ...taslak, konum_notu: e.target.value })}
-                  placeholder="Ör. Santral Binası Kat -1"
-                />
-              </div>
-              <button className="birincilButon" type="submit" disabled={gonderiliyor}>
-                {gonderiliyor ? "Oluşturuluyor…" : "Ekipmanı Oluştur"}
-              </button>
+              {platformAdmin && (
+                <div className="alan">
+                  <label>Holding</label>
+                  <select
+                    required
+                    value={seciliHoldingId}
+                    onChange={(e) => {
+                      setSeciliHoldingId(e.target.value);
+                      setTaslak({ ...taslak, santral_id: "" });
+                    }}
+                  >
+                    <option value="">Seçin…</option>
+                    {holdingler &&
+                      holdingler.map((h) => (
+                        <option key={h.isletme_id} value={h.isletme_id}>
+                          {h.ad}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {(!platformAdmin || seciliHoldingId) && (
+                <>
+                  <div className="alan">
+                    <label>Santral</label>
+                    <select
+                      required
+                      value={taslak.santral_id}
+                      onChange={(e) => setTaslak({ ...taslak, santral_id: e.target.value })}
+                    >
+                      <option value="">Seçin…</option>
+                      {gosterilecekSantraller &&
+                        gosterilecekSantraller.map((s) => (
+                          <option key={s.santral_id} value={s.santral_id}>
+                            {s.ad} {s.isletme_adi ? `(${s.isletme_adi})` : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="alan">
+                    <label>Ekipman adı</label>
+                    <input
+                      required
+                      value={taslak.ad}
+                      onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
+                      placeholder="Ör. Türbin 2"
+                    />
+                  </div>
+                  <div className="alan">
+                    <label>Tip</label>
+                    <input
+                      required
+                      value={taslak.tip}
+                      onChange={(e) => setTaslak({ ...taslak, tip: e.target.value })}
+                      placeholder="Ör. Francis Türbin"
+                    />
+                  </div>
+                  <div className="alan">
+                    <label>Seri no (isteğe bağlı)</label>
+                    <input value={taslak.seri_no} onChange={(e) => setTaslak({ ...taslak, seri_no: e.target.value })} />
+                  </div>
+                  <div className="alan">
+                    <label>Üretici (isteğe bağlı)</label>
+                    <input value={taslak.uretici} onChange={(e) => setTaslak({ ...taslak, uretici: e.target.value })} />
+                  </div>
+                  <div className="alan">
+                    <label>Kurulum tarihi (isteğe bağlı)</label>
+                    <input
+                      type="date"
+                      value={taslak.kurulum_tarihi}
+                      onChange={(e) => setTaslak({ ...taslak, kurulum_tarihi: e.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
+                    <label>Konum notu (isteğe bağlı)</label>
+                    <input
+                      value={taslak.konum_notu}
+                      onChange={(e) => setTaslak({ ...taslak, konum_notu: e.target.value })}
+                      placeholder="Ör. Santral Binası Kat -1"
+                    />
+                  </div>
+                  <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+                    {gonderiliyor ? "Oluşturuluyor…" : "Ekipmanı Oluştur"}
+                  </button>
+                </>
+              )}
             </form>
           )}
         </div>
