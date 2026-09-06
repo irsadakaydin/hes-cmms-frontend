@@ -1,12 +1,13 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi } from "../lib/api";
+import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi } from "../lib/api";
 
 export default function UstBar() {
   const router = useRouter();
   const kullanici = typeof window !== "undefined" ? kullaniciAl() : null;
   const yonetici = typeof window !== "undefined" ? yoneticiMi() : false;
   const isletmeYoneticisi = typeof window !== "undefined" ? isletmeYoneticisiMi() : false;
+  const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
 
   function cikis() {
     cikisYap();
@@ -21,6 +22,7 @@ export default function UstBar() {
         </div>
         <nav className="ustBarNav">
           <Link href="/gorevler">Görevlerim</Link>
+          {platformAdmin && <Link href="/holdingler">Holdingler</Link>}
           {yonetici && <Link href="/santraller">Santraller</Link>}
           {yonetici && <Link href="/rapor-olustur">Rapor Oluştur</Link>}
           {isletmeYoneticisi && <Link href="/sablonlar">Bakım Şablonları</Link>}
