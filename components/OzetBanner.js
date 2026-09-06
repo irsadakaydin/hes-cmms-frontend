@@ -160,6 +160,13 @@ export default function OzetBanner() {
                   renkB="#8fd1a8"
                   onClick={() => router.push(`/bakimlar?santral_id=${v.santral_id}&sekme=TAMAMLANAN`)}
                 />
+                <OzetDaire
+                  sayi={v.durdurulan}
+                  etiket="Durdurulan"
+                  renkA="#5b6b62"
+                  renkB="#b7c2bb"
+                  onClick={() => router.push(`/bakimlar?santral_id=${v.santral_id}&sekme=DURDURULAN`)}
+                />
               </div>
             </div>
           ))}
