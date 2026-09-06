@@ -73,6 +73,8 @@ export default function SablonlarSayfasi() {
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
   const [acikGruplar, setAcikGruplar] = useState({}); // "santralAnahtari|periyot" -> bool
+  const [kopyaAcikSablonId, setKopyaAcikSablonId] = useState(null);
+  const [kopyaHedefHoldingId, setKopyaHedefHoldingId] = useState("");
 
   const [formuAcik, setFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
@@ -277,16 +279,17 @@ export default function SablonlarSayfasi() {
     }
   }
 
-  async function sablonKopyala(sablon) {
+  async function sablonKopyala(sablon, hedefHoldingId) {
     setHata(null);
     setBilgi(null);
     try {
-      const gonderilecek = platformAdminMi ? { hedef_isletme_id: seciliHoldingId } : {};
       await istekAt(`/api/v1/bakim-sablonlari/${sablon.sablon_id}/kopyala`, {
         method: "POST",
-        body: JSON.stringify(gonderilecek),
+        body: JSON.stringify({ hedef_isletme_id: hedefHoldingId }),
       });
-      setBilgi(`"${sablon.ad}" holdinginize kopyalandı.`);
+      const hedefAdi = isletmeler?.find((h) => h.isletme_id === hedefHoldingId)?.ad || "seçilen holdinge";
+      setBilgi(`"${sablon.ad}" ${hedefAdi} kopyalandı.`);
+      setKopyaAcikSablonId(null);
       await verileriYukle();
     } catch (err) {
       setHata(err.message);
@@ -540,21 +543,57 @@ export default function SablonlarSayfasi() {
                     {digerHoldingSablonlari
                       .filter((s) => s.isletme_id !== seciliHoldingId)
                       .map((s) => (
-                        <div className="satirKart" key={s.sablon_id}>
-                          <div>
-                            <strong>{s.ad}</strong>
-                            <span className="gorevAlt"> — {s.isletme_adi}</span>
-                          </div>
-                          <div className="gorevAlt">
-                            {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
-                          </div>
-                          <div className="kullaniciAlt">
-                            <button className="linkButon" onClick={() => sablonKopyala(s)}>
-                              Kendi holdingime kopyala
-                            </button>
-                          </div>
+                      <div className="satirKart" key={s.sablon_id}>
+                        <div>
+                          <strong>{s.ad}</strong>
+                          <span className="gorevAlt"> — {s.isletme_adi}</span>
                         </div>
-                      ))}
+                        <div className="gorevAlt">
+                          {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
+                        </div>
+                        <div className="kullaniciAlt">
+                          {kopyaAcikSablonId === s.sablon_id ? (
+                            <>
+                              <select
+                                value={kopyaHedefHoldingId}
+                                onChange={(e) => setKopyaHedefHoldingId(e.target.value)}
+                                style={{ fontSize: "12px", padding: "4px", marginRight: "10px" }}
+                              >
+                                <option value="">Hedef holding seçin…</option>
+                                {isletmeler &&
+                                  isletmeler
+                                    .filter((h) => h.isletme_id !== s.isletme_id)
+                                    .map((h) => (
+                                      <option key={h.isletme_id} value={h.isletme_id}>
+                                        {h.ad}
+                                      </option>
+                                    ))}
+                              </select>
+                              <button
+                                className="linkButon"
+                                disabled={!kopyaHedefHoldingId}
+                                onClick={() => sablonKopyala(s, kopyaHedefHoldingId)}
+                              >
+                                Kopyala
+                              </button>
+                              <button className="linkButon" onClick={() => setKopyaAcikSablonId(null)}>
+                                Vazgeç
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="linkButon"
+                              onClick={() => {
+                                setKopyaAcikSablonId(s.sablon_id);
+                                setKopyaHedefHoldingId(seciliHoldingId || "");
+                              }}
+                            >
+                              Bir Holdinge Kopyala
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
             </>

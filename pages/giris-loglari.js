@@ -36,6 +36,7 @@ export default function GirisLoglariSayfasi() {
 
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [seciliSantralIdleri, setSeciliSantralIdleri] = useState([]);
+  const [santralPaneliAcik, setSantralPaneliAcik] = useState(false);
   const [seciliKisiId, setSeciliKisiId] = useState("");
   const [baslangic, setBaslangic] = useState("");
   const [bitis, setBitis] = useState("");
@@ -57,6 +58,23 @@ export default function GirisLoglariSayfasi() {
       })
       .catch((err) => setHata(err.message));
   }, [router]);
+
+  // Platform Admin holding ve/veya santral seçtiğinde, Kişi kutusunu da
+  // yalnızca o kapsamdaki kişilerle yeniden dolduruyoruz — aksi halde
+  // kutuda sistemdeki HERKES görünüyordu, holding ayırt etmeksizin.
+  useEffect(() => {
+    if (!platformAdmin) return;
+    const p = new URLSearchParams();
+    if (seciliSantralIdleri.length > 0) {
+      seciliSantralIdleri.forEach((id) => p.append("santral_idleri", id));
+    } else if (seciliHoldingId) {
+      p.set("isletme_id", seciliHoldingId);
+    }
+    setSeciliKisiId("");
+    istekAt(`/api/v1/giris-loglari/filtre-secenekleri?${p.toString()}`)
+      .then((veri) => setKisiler(veri.kisiler))
+      .catch((err) => setHata(err.message));
+  }, [platformAdmin, seciliHoldingId, seciliSantralIdleri]);
 
   const parametreOlustur = useCallback(() => {
     const p = new URLSearchParams();
@@ -133,6 +151,7 @@ export default function GirisLoglariSayfasi() {
                   onChange={(e) => {
                     setSeciliHoldingId(e.target.value);
                     setSeciliSantralIdleri([]);
+                    setSantralPaneliAcik(false);
                   }}
                 >
                   <option value="">Tüm Holdingler</option>
@@ -149,18 +168,30 @@ export default function GirisLoglariSayfasi() {
             {platformAdmin && seciliHoldingId && (
               <div className="alan">
                 <label>Santraller — birden fazla seçebilirsiniz</label>
-                <div className="aliciListesi">
-                  {gosterilecekSantraller.map((s) => (
-                    <label key={s.santral_id} className="aliciSatiri">
-                      <input
-                        type="checkbox"
-                        checked={seciliSantralIdleri.includes(s.santral_id)}
-                        onChange={() => santralSecimiDegistir(s.santral_id)}
-                      />
-                      {s.ad}
-                    </label>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  className="periyotGrupBasligi"
+                  onClick={() => setSantralPaneliAcik((v) => !v)}
+                >
+                  {santralPaneliAcik ? "▾" : "▸"}{" "}
+                  {seciliSantralIdleri.length > 0
+                    ? `${seciliSantralIdleri.length} santral seçili`
+                    : "Tüm Santraller (seçmek için tıklayın)"}
+                </button>
+                {santralPaneliAcik && (
+                  <div className="aliciListesi">
+                    {gosterilecekSantraller.map((s) => (
+                      <label key={s.santral_id} className="aliciSatiri">
+                        <input
+                          type="checkbox"
+                          checked={seciliSantralIdleri.includes(s.santral_id)}
+                          onChange={() => santralSecimiDegistir(s.santral_id)}
+                        />
+                        {s.ad}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
