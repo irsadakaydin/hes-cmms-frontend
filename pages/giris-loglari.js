@@ -1,0 +1,211 @@
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+import Head from "next/head";
+import { istekAt, tokenAl, isletmeYoneticisiMi, platformAdminMi, dosyaIndir } from "../lib/api";
+import UstBar from "../components/UstBar";
+
+const ROL_ETIKETLERI = {
+  ADMIN: "Platform Admin",
+  ISLETME_ADMIN: "İşletme Admin",
+  SANTRAL_SORUMLUSU: "Santral Sorumlusu",
+  SAHA_PERSONELI: "Saha Personeli",
+  IZLEYICI: "İzleyici",
+};
+
+function tarihSaatFormatla(deger) {
+  if (!deger) return "—";
+  return new Date(deger).toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function GirisLoglariSayfasi() {
+  const router = useRouter();
+  const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
+
+  const [kisiler, setKisiler] = useState(null);
+  const [holdingler, setHoldingler] = useState(null);
+  const [santraller, setSantraller] = useState(null);
+  const [kayitlar, setKayitlar] = useState(null);
+  const [hata, setHata] = useState(null);
+  const [indiriliyor, setIndiriliyor] = useState(false);
+
+  const [seciliHoldingId, setSeciliHoldingId] = useState("");
+  const [seciliSantralIdleri, setSeciliSantralIdleri] = useState([]);
+  const [seciliKisiId, setSeciliKisiId] = useState("");
+  const [baslangic, setBaslangic] = useState("");
+  const [bitis, setBitis] = useState("");
+
+  useEffect(() => {
+    if (!tokenAl()) {
+      router.replace("/");
+      return;
+    }
+    if (!isletmeYoneticisiMi()) {
+      router.replace("/gorevler");
+      return;
+    }
+    istekAt("/api/v1/giris-loglari/filtre-secenekleri")
+      .then((veri) => {
+        setKisiler(veri.kisiler);
+        setHoldingler(veri.holdingler);
+        setSantraller(veri.santraller);
+      })
+      .catch((err) => setHata(err.message));
+  }, [router]);
+
+  const parametreOlustur = useCallback(() => {
+    const p = new URLSearchParams();
+    if (platformAdmin && seciliSantralIdleri.length > 0) {
+      seciliSantralIdleri.forEach((id) => p.append("santral_idleri", id));
+    } else if (platformAdmin && seciliHoldingId) {
+      p.set("isletme_id", seciliHoldingId);
+    }
+    if (seciliKisiId) p.set("kullanici_id", seciliKisiId);
+    if (baslangic) p.set("baslangic", baslangic);
+    if (bitis) p.set("bitis", bitis);
+    return p;
+  }, [platformAdmin, seciliHoldingId, seciliSantralIdleri, seciliKisiId, baslangic, bitis]);
+
+  const kayitlariGetir = useCallback(async () => {
+    setHata(null);
+    try {
+      const sonuc = await istekAt(`/api/v1/giris-loglari?${parametreOlustur().toString()}`);
+      setKayitlar(sonuc.veri);
+    } catch (err) {
+      setHata(err.message);
+    }
+  }, [parametreOlustur]);
+
+  useEffect(() => {
+    kayitlariGetir();
+  }, [kayitlariGetir]);
+
+  function santralSecimiDegistir(santralId) {
+    setSeciliSantralIdleri((onceki) =>
+      onceki.includes(santralId) ? onceki.filter((id) => id !== santralId) : [...onceki, santralId]
+    );
+  }
+
+  async function pdfIndir() {
+    setIndiriliyor(true);
+    setHata(null);
+    try {
+      await dosyaIndir(`/api/v1/giris-loglari/pdf?${parametreOlustur().toString()}`, "giris-loglari.pdf");
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setIndiriliyor(false);
+    }
+  }
+
+  const gosterilecekSantraller = seciliHoldingId
+    ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
+    : [];
+
+  return (
+    <>
+      <Head>
+        <title>Giriş Logları — HES CMMS</title>
+      </Head>
+      <div className="sayfa">
+        <UstBar />
+        <div className="icerik">
+          <div className="bolumBaslik">
+            <h2>Giriş Logları</h2>
+            <button className="kucukButon" onClick={pdfIndir} disabled={indiriliyor}>
+              {indiriliyor ? "Hazırlanıyor…" : "PDF Rapor İndir"}
+            </button>
+          </div>
+
+          {hata && <div className="hataKutusu">{hata}</div>}
+
+          <div className="yonetimFormu">
+            {platformAdmin && (
+              <div className="alan">
+                <label>Holding</label>
+                <select
+                  value={seciliHoldingId}
+                  onChange={(e) => {
+                    setSeciliHoldingId(e.target.value);
+                    setSeciliSantralIdleri([]);
+                  }}
+                >
+                  <option value="">Tüm Holdingler</option>
+                  {holdingler &&
+                    holdingler.map((h) => (
+                      <option key={h.isletme_id} value={h.isletme_id}>
+                        {h.ad}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {platformAdmin && seciliHoldingId && (
+              <div className="alan">
+                <label>Santraller — birden fazla seçebilirsiniz</label>
+                <div className="aliciListesi">
+                  {gosterilecekSantraller.map((s) => (
+                    <label key={s.santral_id} className="aliciSatiri">
+                      <input
+                        type="checkbox"
+                        checked={seciliSantralIdleri.includes(s.santral_id)}
+                        onChange={() => santralSecimiDegistir(s.santral_id)}
+                      />
+                      {s.ad}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="alan">
+              <label>Kişi</label>
+              <select value={seciliKisiId} onChange={(e) => setSeciliKisiId(e.target.value)}>
+                <option value="">Tüm Kişiler</option>
+                {kisiler &&
+                  kisiler.map((k) => (
+                    <option key={k.kullanici_id} value={k.kullanici_id}>
+                      {k.ad_soyad}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "12px" }}>
+              <div className="alan" style={{ flex: 1 }}>
+                <label>Başlangıç tarihi</label>
+                <input type="date" value={baslangic} onChange={(e) => setBaslangic(e.target.value)} />
+              </div>
+              <div className="alan" style={{ flex: 1 }}>
+                <label>Bitiş tarihi</label>
+                <input type="date" value={bitis} onChange={(e) => setBitis(e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          {!kayitlar && <div className="yukleniyor">Yükleniyor…</div>}
+          {kayitlar && kayitlar.length === 0 && (
+            <div className="bosDurum">Seçilen filtrelerle eşleşen giriş kaydı yok.</div>
+          )}
+          {kayitlar &&
+            kayitlar.map((k) => (
+              <div className="satirKart" key={k.kayit_id}>
+                <div>
+                  <strong>{k.ad_soyad}</strong> — {k.eposta}
+                </div>
+                <div className="gorevAlt">
+                  {ROL_ETIKETLERI[k.rol] || k.rol} · {k.isletme_adi} · {tarihSaatFormatla(k.giris_tarihi)}
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </>
+  );
+}
