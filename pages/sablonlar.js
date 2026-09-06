@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, isletmeYoneticisiMi, kullaniciAl } from "../lib/api";
+import { istekAt, tokenAl, isletmeYoneticisiMi, yoneticiMi, kullaniciAl } from "../lib/api";
 import { excelDenSablonCikar } from "../lib/excelSablonImport";
 import UstBar from "../components/UstBar";
 
@@ -46,7 +46,7 @@ export default function SablonlarSayfasi() {
 
   const verileriYukle = useCallback(async () => {
     try {
-      const s = await istekAt("/api/v1/bakim-sablonlari");
+      const s = await istekAt("/api/v1/bakim-sablonlari?hepsi=1");
       setSablonlar(s.veri);
       if (platformAdminMi) {
         const i = await istekAt("/api/v1/isletmeler");
@@ -62,7 +62,7 @@ export default function SablonlarSayfasi() {
       router.replace("/");
       return;
     }
-    if (!isletmeYoneticisiMi()) {
+    if (!yoneticiMi()) {
       router.replace("/gorevler");
       return;
     }
@@ -191,6 +191,30 @@ export default function SablonlarSayfasi() {
       setHata(err.message);
     } finally {
       setGonderiliyor(false);
+    }
+  }
+
+  async function sablonDurumDegistir(sablon) {
+    setHata(null);
+    try {
+      const yol = sablon.aktif_mi
+        ? `/api/v1/bakim-sablonlari/${sablon.sablon_id}/pasiflestir`
+        : `/api/v1/bakim-sablonlari/${sablon.sablon_id}/aktiflestir`;
+      await istekAt(yol, { method: "POST" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  async function sablonSil(sablon) {
+    if (!confirm(`"${sablon.ad}" şablonunu kalıcı olarak silmek istediğinize emin misiniz?`)) return;
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/bakim-sablonlari/${sablon.sablon_id}`, { method: "DELETE" });
+      await verileriYukle();
+    } catch (err) {
+      setHata(err.message);
     }
   }
 
@@ -343,6 +367,11 @@ export default function SablonlarSayfasi() {
                 <div>
                   <strong>{s.ad}</strong>
                   {platformAdminMi && <span className="gorevAlt"> — {s.isletme_adi}</span>}
+                  {!s.aktif_mi && (
+                    <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
+                      Pasif
+                    </span>
+                  )}
                 </div>
                 <div className="gorevAlt">
                   {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi} · v{s.versiyon}
@@ -350,6 +379,12 @@ export default function SablonlarSayfasi() {
                 <div className="kullaniciAlt">
                   <button className="linkButon" onClick={() => duzenlemeyiBaslat(s)}>
                     Düzenle
+                  </button>
+                  <button className="linkButon" onClick={() => sablonDurumDegistir(s)}>
+                    {s.aktif_mi ? "Pasifleştir" : "Yeniden aktifleştir"}
+                  </button>
+                  <button className="linkButon" onClick={() => sablonSil(s)}>
+                    Sil
                   </button>
                 </div>
               </div>
