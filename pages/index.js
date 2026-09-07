@@ -12,9 +12,9 @@ export default function GirisSayfasi() {
 
   useEffect(() => {
     if (tokenAl()) {
-      router.replace("/gorevler");
+      router.replace(router.query.sonra ? decodeURIComponent(router.query.sonra) : "/gorevler");
     }
-  }, [router]);
+  }, [router, router.query.sonra]);
 
   async function gonder(e) {
     e.preventDefault();
@@ -22,7 +22,7 @@ export default function GirisSayfasi() {
     setYukleniyor(true);
     try {
       await girisYap(eposta, sifre);
-      router.push("/gorevler");
+      router.push(router.query.sonra ? decodeURIComponent(router.query.sonra) : "/gorevler");
     } catch (err) {
       setHata(err.message || "Giriş yapılamadı.");
     } finally {
