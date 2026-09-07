@@ -141,19 +141,39 @@ export default function OtoBakimPlanlaSayfasi() {
 
     for (const s of sablonListesi) {
       const durum = sablonDurumlari[s.sablon_id];
+      const govde = {
+        santral_id: seciliSantralId,
+        sorumlu_kullanici_idleri: durum.seciliKisiler,
+        baslangic_tarihi: OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) ? undefined : durum.baslangic,
+        bitis_tarihi: OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) ? undefined : durum.bitis || undefined,
+      };
       try {
         const sonuc = await istekAt(`/api/v1/bakim-sablonlari/${s.sablon_id}/oto-planla`, {
           method: "POST",
-          body: JSON.stringify({
-            santral_id: seciliSantralId,
-            sorumlu_kullanici_idleri: durum.seciliKisiler,
-            baslangic_tarihi: OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) ? undefined : durum.baslangic,
-            bitis_tarihi: OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) ? undefined : durum.bitis || undefined,
-          }),
+          body: JSON.stringify(govde),
         });
         toplamOlusturulan += sonuc.olusturulan_sayisi || 0;
       } catch (err) {
-        hatalar.push(`${s.ad}: ${err.message}`);
+        if (err.hata_kodu === "MUKERRER_TESPIT_EDILDI") {
+          const tekrarGonderilsinMi = confirm(
+            `"${s.ad}" daha önce gönderilmiştir. Tekrar göndermek istiyor musunuz?`
+          );
+          if (tekrarGonderilsinMi) {
+            try {
+              const zorlaSonuc = await istekAt(`/api/v1/bakim-sablonlari/${s.sablon_id}/oto-planla`, {
+                method: "POST",
+                body: JSON.stringify({ ...govde, zorla: true }),
+              });
+              toplamOlusturulan += zorlaSonuc.olusturulan_sayisi || 0;
+            } catch (zorlaErr) {
+              hatalar.push(`${s.ad}: ${zorlaErr.message}`);
+            }
+          } else {
+            alert(`"${s.ad}" Bu Bakım Planı Oluşturulmadı`);
+          }
+        } else {
+          hatalar.push(`${s.ad}: ${err.message}`);
+        }
       }
     }
 
