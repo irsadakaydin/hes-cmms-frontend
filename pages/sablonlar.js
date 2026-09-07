@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, yoneticiMi, kullaniciAl } from "../lib/api";
+import { istekAt, tokenAl, yoneticiMi, kullaniciAl, dosyaIndir } from "../lib/api";
 import { excelDenSablonCikar } from "../lib/excelSablonImport";
 import UstBar from "../components/UstBar";
 
@@ -87,6 +87,7 @@ export default function SablonlarSayfasi() {
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosSablon(kendiIsletmeId));
   const [duzenlenenSablonId, setDuzenlenenSablonId] = useState(null);
+  const [acikKarekodId, setAcikKarekodId] = useState(null);
 
   const verileriYukle = useCallback(async () => {
     try {
@@ -239,7 +240,7 @@ export default function SablonlarSayfasi() {
         });
         setBilgi("Şablon güncellendi — yeni bir versiyon olarak kaydedildi, eski versiyon pasifleşti.");
       } else {
-        await istekAt("/api/v1/bakim-sablonlari", {
+        const yeniSablon = await istekAt("/api/v1/bakim-sablonlari", {
           method: "POST",
           body: JSON.stringify({
             ad: taslak.ad,
@@ -250,7 +251,12 @@ export default function SablonlarSayfasi() {
             santral_id: taslak.santral_id || null,
           }),
         });
-        setBilgi("Bakım şablonu kaydedildi.");
+        setBilgi("Bakım şablonu kaydedildi. Karekodu aşağıda görebilirsiniz.");
+        setAcikKarekodId(yeniSablon.sablon_id);
+        setAcikGruplar((onceki) => ({
+          ...onceki,
+          [grupAnahtari(taslak.santral_id || null, taslak.periyot_tipi)]: true,
+        }));
       }
       setFormuAcik(false);
       setDuzenlenenSablonId(null);
@@ -533,7 +539,43 @@ export default function SablonlarSayfasi() {
                                   <button className="linkButon" onClick={() => sablonSil(s)}>
                                     Sil
                                   </button>
+                                  <button
+                                    className="linkButon"
+                                    onClick={() =>
+                                      setAcikKarekodId((onceki) => (onceki === s.sablon_id ? null : s.sablon_id))
+                                    }
+                                  >
+                                    {acikKarekodId === s.sablon_id ? "Karekodu Gizle" : "Karekod Göster"}
+                                  </button>
+                                  <a
+                                    className="linkButon"
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      dosyaIndir(`/api/v1/bakim-sablonlari/${s.sablon_id}/karekod-pdf`, `karekod-${s.ad}.pdf`);
+                                    }}
+                                  >
+                                    Karekod PDF İndir
+                                  </a>
                                 </div>
+                                {acikKarekodId === s.sablon_id && (
+                                  <div style={{ textAlign: "center", padding: "12px 0" }}>
+                                    <img
+                                      src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+                                        `${typeof window !== "undefined" ? window.location.origin : ""}/karekod-sablon/${s.sablon_id}`
+                                      )}`}
+                                      alt={`${s.ad} karekodu`}
+                                      width={220}
+                                      height={220}
+                                    />
+                                    <div className="gorevAlt" style={{ marginTop: "6px", fontWeight: 600 }}>
+                                      {s.ad}
+                                    </div>
+                                    <div className="gorevAlt">
+                                      Bu karekodu yazdırıp ilgili ekipmanın üzerine yapıştırın.
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             ))}
                         </div>
