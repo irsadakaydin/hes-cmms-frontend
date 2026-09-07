@@ -87,21 +87,22 @@ export default function BakimPlaniOlusturSayfasi() {
     [santraller]
   );
 
-  // Seçilen ekipmanın tipi VE seçilen periyoda göre şablon listesini anlık
-  // süzer — ör. "Türbin 1" (tip: Türbin) + "Aylık" seçilince yalnızca
-  // Türbin tipi + Aylık periyotlu şablonlar seçilebilir listede kalır.
+  // Seçilen ekipmanın tipine göre şablon listesini anlık süzer — ör.
+  // "Türbin 1" (tip: Türbin) seçilince yalnızca o tipteki şablonlar
+  // listelenir (periyot, seçilen şablona göre OTOMATİK belirlenir — ayrıca
+  // önceden bir periyot seçmenize gerek yok).
   const seciliEkipman = (ekipmanlar || []).find((ek) => ek.ekipman_id === taslak.ekipman_id);
   const gosterilecekSablonlar = (tumSablonlar || []).filter((sb) => {
     if (seciliEkipman && sb.ekipman_tipi !== seciliEkipman.tip) return false;
-    if (taslak.periyot && sb.periyot_tipi !== taslak.periyot) return false;
     return true;
   });
 
   function ekipmanSecildi(ekipmanId) {
     setTaslak((t) => ({ ...t, ekipman_id: ekipmanId, sablon_id: "" }));
   }
-  function periyotSecildi(periyot) {
-    setTaslak((t) => ({ ...t, periyot, sablon_id: "" }));
+  function sablonSecildi(sablonId) {
+    const sb = (tumSablonlar || []).find((s) => s.sablon_id === sablonId);
+    setTaslak((t) => ({ ...t, sablon_id: sablonId, periyot: sb ? sb.periyot_tipi : t.periyot }));
   }
 
   function sorumluSecimiDegistir(kullaniciId) {
@@ -222,36 +223,32 @@ export default function BakimPlaniOlusturSayfasi() {
                   </div>
 
                   <div className="alan">
-                    <label>Periyot</label>
-                    <select value={taslak.periyot} onChange={(e) => periyotSecildi(e.target.value)}>
+                    <label>Bakım şablonu — seçilen ekipman tipine göre süzülür</label>
+                    <select required value={taslak.sablon_id} onChange={(e) => sablonSecildi(e.target.value)}>
+                      <option value="">Seçin…</option>
+                      {gosterilecekSablonlar.map((sb) => (
+                        <option key={sb.sablon_id} value={sb.sablon_id}>
+                          {sb.ad} ({PERIYOT_ETIKETLERI[sb.periyot_tipi] || sb.periyot_tipi})
+                        </option>
+                      ))}
+                    </select>
+                    {taslak.ekipman_id && gosterilecekSablonlar.length === 0 && (
+                      <div className="kutuphaneBosUyari">
+                        Bu ekipman tipi için henüz bir bakım şablonu yok —{" "}
+                        <a href="/sablonlar">Bakım Şablonları</a>'ndan ekleyin.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="alan">
+                    <label>Periyot — seçtiğiniz şablona göre otomatik dolar</label>
+                    <select value={taslak.periyot} disabled>
                       {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
                         <option key={deger} value={deger}>
                           {etiket}
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  <div className="alan">
-                    <label>Bakım şablonu — seçilen ekipman ve periyoda göre süzülür</label>
-                    <select
-                      required
-                      value={taslak.sablon_id}
-                      onChange={(e) => setTaslak({ ...taslak, sablon_id: e.target.value })}
-                    >
-                      <option value="">Seçin…</option>
-                      {gosterilecekSablonlar.map((sb) => (
-                        <option key={sb.sablon_id} value={sb.sablon_id}>
-                          {sb.ad} ({sb.ekipman_tipi})
-                        </option>
-                      ))}
-                    </select>
-                    {taslak.ekipman_id && gosterilecekSablonlar.length === 0 && (
-                      <div className="kutuphaneBosUyari">
-                        Bu ekipman tipi + periyot için henüz bir bakım şablonu yok —{" "}
-                        <a href="/sablonlar">Bakım Şablonları</a>'ndan ekleyin.
-                      </div>
-                    )}
                   </div>
 
                   <div className="alan">
