@@ -552,7 +552,11 @@ export default function SablonlarSayfasi() {
                                     href="#"
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      dosyaIndir(`/api/v1/bakim-sablonlari/${s.sablon_id}/karekod-pdf`, `karekod-${s.ad}.pdf`);
+                                      const site = encodeURIComponent(window.location.origin);
+                                      dosyaIndir(
+                                        `/api/v1/bakim-sablonlari/${s.sablon_id}/karekod-pdf?site=${site}`,
+                                        `karekod-${s.ad}.pdf`
+                                      );
                                     }}
                                   >
                                     Karekod PDF İndir
