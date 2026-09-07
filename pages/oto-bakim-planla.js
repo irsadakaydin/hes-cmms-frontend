@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { istekAt, tokenAl, yoneticiMi, platformAdminMi, kullaniciAl } from "../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -24,6 +24,10 @@ const PERIYOT_SIRASI = [
 // 1'i) — diğer tüm periyotlarda kullanıcı elle başlangıç+bitiş tarihi girer.
 const OTOMATIK_TARIHLI_PERIYOTLAR = ["HAFTALIK", "AYLIK"];
 
+function bosSablonDurumu() {
+  return { acik: false, seciliKisiler: [], baslangic: "", bitis: "" };
+}
+
 function periyodaGoreGrupla(sablonlar) {
   const gruplar = new Map();
   for (const s of sablonlar) {
@@ -36,20 +40,18 @@ function periyodaGoreGrupla(sablonlar) {
 export default function OtoBakimPlanlaSayfasi() {
   const router = useRouter();
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
-  const kendiIsletmeId = typeof window !== "undefined" ? kullaniciAl()?.isletme_id : null;
 
+  const [santraller, setSantraller] = useState(null);
   const [holdingler, setHoldingler] = useState(null);
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
+  const [seciliSantralId, setSeciliSantralId] = useState("");
   const [sablonlar, setSablonlar] = useState(null);
   const [sahaPersoneli, setSahaPersoneli] = useState(null);
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
-
-  const [acikPeriyot, setAcikPeriyot] = useState(null);
-  const [seciliKisiler, setSeciliKisiler] = useState([]);
-  const [elleBaslangic, setElleBaslangic] = useState("");
-  const [elleBitis, setElleBitis] = useState("");
-  const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [acikGrup, setAcikGrup] = useState(null);
+  const [sablonDurumlari, setSablonDurumlari] = useState({}); // sablon_id -> {acik, seciliKisiler, baslangic, bitis}
+  const [gonderiliyorGrup, setGonderiliyorGrup] = useState(null);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -60,99 +62,112 @@ export default function OtoBakimPlanlaSayfasi() {
       router.replace("/gorevler");
       return;
     }
-    if (platformAdminMi()) {
-      istekAt("/api/v1/isletmeler")
-        .then((veri) => setHoldingler(veri.veri))
-        .catch((err) => setHata(err.message));
-    }
+    const istekler = [istekAt("/api/v1/santraller")];
+    if (platformAdminMi()) istekler.push(istekAt("/api/v1/isletmeler"));
+    Promise.all(istekler)
+      .then(([s, h]) => {
+        setSantraller(s.veri);
+        if (h) setHoldingler(h.veri);
+      })
+      .catch((err) => setHata(err.message));
   }, [router]);
 
   const verileriGetir = useCallback(async () => {
-    const hedefId = platformAdmin ? seciliHoldingId : kendiIsletmeId;
-    if (!hedefId) return;
+    if (!seciliSantralId) return;
     setHata(null);
     try {
+      const santral = santraller.find((s) => s.santral_id === seciliSantralId);
       const [sb, sp] = await Promise.all([
-        istekAt(`/api/v1/bakim-sablonlari?hepsi=1&isletme_id=${hedefId}`),
-        istekAt(`/api/v1/bakim-sablonlari/saha-personeli?isletme_id=${hedefId}`),
+        istekAt(`/api/v1/bakim-sablonlari?hepsi=1&isletme_id=${santral.isletme_id}&santral_id=${seciliSantralId}`),
+        istekAt(`/api/v1/bakim-sablonlari/saha-personeli?santral_id=${seciliSantralId}`),
       ]);
       setSablonlar(sb.veri.filter((s) => s.aktif_mi));
       setSahaPersoneli(sp.veri);
+      setSablonDurumlari({});
+      setAcikGrup(null);
     } catch (err) {
       setHata(err.message);
     }
-  }, [platformAdmin, seciliHoldingId, kendiIsletmeId]);
+  }, [seciliSantralId, santraller]);
 
   useEffect(() => {
     verileriGetir();
   }, [verileriGetir]);
 
-  function grubuAcKapa(periyot) {
-    if (acikPeriyot === periyot) {
-      setAcikPeriyot(null);
-      return;
-    }
-    setAcikPeriyot(periyot);
-    setSeciliKisiler([]);
-    setElleBaslangic("");
-    setElleBitis("");
-    setBilgi(null);
-    setHata(null);
+  function sablonPaneliAcKapa(sablonId) {
+    setSablonDurumlari((onceki) => {
+      const mevcut = onceki[sablonId] || bosSablonDurumu();
+      return { ...onceki, [sablonId]: { ...mevcut, acik: !mevcut.acik } };
+    });
   }
 
-  function kisiSecimiDegistir(kisiId) {
-    setSeciliKisiler((onceki) =>
-      onceki.includes(kisiId) ? onceki.filter((id) => id !== kisiId) : [...onceki, kisiId]
-    );
+  function sablonKisiSecimiDegistir(sablonId, kisiId) {
+    setSablonDurumlari((onceki) => {
+      const mevcut = onceki[sablonId] || bosSablonDurumu();
+      const kisiler = mevcut.seciliKisiler.includes(kisiId)
+        ? mevcut.seciliKisiler.filter((id) => id !== kisiId)
+        : [...mevcut.seciliKisiler, kisiId];
+      return { ...onceki, [sablonId]: { ...mevcut, seciliKisiler: kisiler } };
+    });
   }
 
-  // Bir periyot grubundaki TÜM şablonları tek seferde, aynı personel/tarih
-  // seçimiyle otomatik planlar — tek tek göndermeye gerek kalmaz.
-  async function grubuOtomatikGonder(periyot, sablonListesi) {
-    if (acikPeriyot !== periyot) {
-      grubuAcKapa(periyot);
-      return;
-    }
-    if (seciliKisiler.length === 0) {
-      setHata("En az bir saha personeli seçmelisiniz.");
-      return;
-    }
-    const otomatikTarihli = OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot);
-    if (!otomatikTarihli && !elleBaslangic) {
-      setHata("Bu periyot için Bakım Başlama Tarihi girmelisiniz.");
-      return;
+  function sablonTarihGuncelle(sablonId, alan, deger) {
+    setSablonDurumlari((onceki) => {
+      const mevcut = onceki[sablonId] || bosSablonDurumu();
+      return { ...onceki, [sablonId]: { ...mevcut, [alan]: deger } };
+    });
+  }
+
+  // Bir periyot grubundaki TÜM şablonları gönderir — her şablon KENDİ seçili
+  // personelini ve (varsa) kendi başlangıç/bitiş tarihini kullanır.
+  async function grubuGonder(periyot, sablonListesi) {
+    for (const s of sablonListesi) {
+      const durum = sablonDurumlari[s.sablon_id];
+      if (!durum || durum.seciliKisiler.length === 0) {
+        setHata(`"${s.ad}" için en az bir saha personeli seçmelisiniz.`);
+        return;
+      }
+      if (!OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) && !durum.baslangic) {
+        setHata(`"${s.ad}" için Bakım Başlama Tarihi girmelisiniz.`);
+        return;
+      }
     }
 
-    setGonderiliyor(true);
+    setGonderiliyorGrup(periyot);
     setHata(null);
     setBilgi(null);
     let toplamOlusturulan = 0;
     const hatalar = [];
 
-    for (const sablon of sablonListesi) {
+    for (const s of sablonListesi) {
+      const durum = sablonDurumlari[s.sablon_id];
       try {
-        const sonuc = await istekAt(`/api/v1/bakim-sablonlari/${sablon.sablon_id}/oto-planla`, {
+        const sonuc = await istekAt(`/api/v1/bakim-sablonlari/${s.sablon_id}/oto-planla`, {
           method: "POST",
           body: JSON.stringify({
-            sorumlu_kullanici_idleri: seciliKisiler,
-            baslangic_tarihi: otomatikTarihli ? undefined : elleBaslangic,
-            bitis_tarihi: otomatikTarihli ? undefined : elleBitis || undefined,
+            santral_id: seciliSantralId,
+            sorumlu_kullanici_idleri: durum.seciliKisiler,
+            baslangic_tarihi: OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) ? undefined : durum.baslangic,
+            bitis_tarihi: OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot) ? undefined : durum.bitis || undefined,
           }),
         });
         toplamOlusturulan += sonuc.olusturulan_sayisi || 0;
       } catch (err) {
-        hatalar.push(`${sablon.ad}: ${err.message}`);
+        hatalar.push(`${s.ad}: ${err.message}`);
       }
     }
 
-    setGonderiliyor(false);
-    setAcikPeriyot(null);
+    setGonderiliyorGrup(null);
+    setAcikGrup(null);
     setBilgi(
       `${sablonListesi.length} şablon işlendi, toplam ${toplamOlusturulan} bakım planı oluşturuldu.` +
         (hatalar.length > 0 ? ` Sorun çıkan şablonlar: ${hatalar.join(" · ")}` : "")
     );
   }
 
+  const gosterilecekSantraller = platformAdmin
+    ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
+    : santraller;
   const gruplar = sablonlar ? periyodaGoreGrupla(sablonlar) : null;
 
   return (
@@ -169,40 +184,61 @@ export default function OtoBakimPlanlaSayfasi() {
 
           {hata && <div className="hataKutusu">{hata}</div>}
           {bilgi && <div className="basariliKutu">{bilgi}</div>}
+          {!santraller && !hata && <div className="yukleniyor">Yükleniyor…</div>}
 
-          {platformAdmin && (
-            <div className="alan" style={{ maxWidth: "340px" }}>
-              <label>Holding</label>
-              <select
-                value={seciliHoldingId}
-                onChange={(e) => {
-                  setSeciliHoldingId(e.target.value);
-                  setAcikPeriyot(null);
-                }}
-              >
-                <option value="">Bir holding seçin…</option>
-                {holdingler &&
-                  holdingler.map((h) => (
-                    <option key={h.isletme_id} value={h.isletme_id}>
-                      {h.ad}
-                    </option>
-                  ))}
-              </select>
+          {santraller && (
+            <div className="yonetimFormu">
+              {platformAdmin && (
+                <div className="alan">
+                  <label>Holding</label>
+                  <select
+                    value={seciliHoldingId}
+                    onChange={(e) => {
+                      setSeciliHoldingId(e.target.value);
+                      setSeciliSantralId("");
+                    }}
+                  >
+                    <option value="">Bir holding seçin…</option>
+                    {holdingler &&
+                      holdingler.map((h) => (
+                        <option key={h.isletme_id} value={h.isletme_id}>
+                          {h.ad}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {(!platformAdmin || seciliHoldingId) && (
+                <div className="alan">
+                  <label>Santral</label>
+                  <select value={seciliSantralId} onChange={(e) => setSeciliSantralId(e.target.value)}>
+                    <option value="">Bir santral seçin…</option>
+                    {gosterilecekSantraller &&
+                      gosterilecekSantraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 
           {platformAdmin && !seciliHoldingId && (
-            <div className="bosDurum">Şablonları görmek için önce bir holding seçin.</div>
+            <div className="bosDurum">Devam etmek için önce bir holding seçin.</div>
+          )}
+          {(!platformAdmin || seciliHoldingId) && !seciliSantralId && (
+            <div className="bosDurum">Şablonları görmek için bir santral seçin.</div>
           )}
 
-          {!sablonlar && (!platformAdmin || seciliHoldingId) && (
-            <div className="yukleniyor">Yükleniyor…</div>
-          )}
+          {seciliSantralId && !sablonlar && <div className="yukleniyor">Yükleniyor…</div>}
 
           {gruplar &&
             PERIYOT_SIRASI.filter((p) => gruplar.has(p)).map((periyot) => {
               const sablonListesi = gruplar.get(periyot);
-              const acik = acikPeriyot === periyot;
+              const acik = acikGrup === periyot;
               const otomatikTarihli = OTOMATIK_TARIHLI_PERIYOTLAR.includes(periyot);
               return (
                 <div key={periyot} style={{ marginBottom: "14px" }}>
@@ -211,78 +247,88 @@ export default function OtoBakimPlanlaSayfasi() {
                       type="button"
                       className="periyotGrupBasligi"
                       style={{ flex: 1, textAlign: "left" }}
-                      onClick={() => grubuAcKapa(periyot)}
+                      onClick={() => setAcikGrup(acik ? null : periyot)}
                     >
                       {acik ? "▾" : "▸"} {PERIYOT_ETIKETLERI[periyot]} Bakımlar ({sablonListesi.length})
                     </button>
                     <button
                       className="birincilButon"
                       style={{ width: "auto", padding: "9px 18px" }}
-                      disabled={gonderiliyor}
-                      onClick={() => grubuOtomatikGonder(periyot, sablonListesi)}
+                      disabled={gonderiliyorGrup !== null}
+                      onClick={() => (acik ? grubuGonder(periyot, sablonListesi) : setAcikGrup(periyot))}
                     >
-                      {gonderiliyor && acik ? "Gönderiliyor…" : "Otomatik Gönder"}
+                      {gonderiliyorGrup === periyot ? "Gönderiliyor…" : "Otomatik Gönder"}
                     </button>
                   </div>
 
                   {acik && (
-                    <div className="yonetimFormu" style={{ marginTop: "8px" }}>
-                      {otomatikTarihli ? (
-                        <div className="gorevAlt" style={{ marginBottom: "10px" }}>
-                          {periyot === "HAFTALIK"
-                            ? "Başlangıç tarihi otomatik: içinde bulunulan haftanın Pazartesi günü."
-                            : "Başlangıç tarihi otomatik: içinde bulunulan ayın 1'i."}
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", gap: "12px" }}>
-                          <div className="alan" style={{ flex: 1 }}>
-                            <label>Bakım Başlama Tarihi</label>
-                            <input
-                              type="date"
-                              value={elleBaslangic}
-                              onChange={(e) => setElleBaslangic(e.target.value)}
-                            />
-                          </div>
-                          <div className="alan" style={{ flex: 1 }}>
-                            <label>Bakım Bitiş Tarihi (isteğe bağlı)</label>
-                            <input
-                              type="date"
-                              value={elleBitis}
-                              onChange={(e) => setElleBitis(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      )}
+                    <div style={{ marginTop: "8px" }}>
+                      {sablonListesi.map((s) => {
+                        const durum = sablonDurumlari[s.sablon_id] || bosSablonDurumu();
+                        return (
+                          <div className="satirKart" key={s.sablon_id}>
+                            <div>
+                              <strong>{s.ad}</strong>
+                            </div>
+                            <div className="gorevAlt">
+                              {s.ekipman_tipi}
+                              {s.santral_adi ? ` · yalnızca ${s.santral_adi}` : ""}
+                            </div>
 
-                      <div className="alan">
-                        <label>Görevlendirilecek saha personeli — birden fazla seçebilirsiniz</label>
-                        <div className="aliciListesi">
-                          {sahaPersoneli &&
-                            sahaPersoneli.map((k) => (
-                              <label key={k.kullanici_id} className="aliciSatiri">
-                                <input
-                                  type="checkbox"
-                                  checked={seciliKisiler.includes(k.kullanici_id)}
-                                  onChange={() => kisiSecimiDegistir(k.kullanici_id)}
-                                />
-                                {k.ad_soyad}
-                              </label>
-                            ))}
-                          {sahaPersoneli && sahaPersoneli.length === 0 && (
-                            <div className="gorevAlt">Bu holdingde tanımlı saha personeli yok.</div>
-                          )}
-                        </div>
-                      </div>
+                            <button
+                              type="button"
+                              className="linkButon"
+                              onClick={() => sablonPaneliAcKapa(s.sablon_id)}
+                            >
+                              {durum.acik ? "▾" : "▸"} Görevlendirilecek personel
+                              {durum.seciliKisiler.length > 0 ? ` (${durum.seciliKisiler.length} seçili)` : ""}
+                            </button>
 
-                      <div className="gorevAlt" style={{ marginBottom: "4px" }}>
-                        Bu grupta gönderilecek şablonlar:
-                      </div>
-                      {sablonListesi.map((s) => (
-                        <div className="gorevAlt" key={s.sablon_id}>
-                          · {s.ad} ({s.ekipman_tipi}
-                          {s.santral_adi ? ` — yalnızca ${s.santral_adi}` : " — holding geneli"})
-                        </div>
-                      ))}
+                            {durum.acik && (
+                              <div style={{ marginTop: "8px" }}>
+                                {!otomatikTarihli && (
+                                  <div style={{ display: "flex", gap: "12px", marginBottom: "10px" }}>
+                                    <div className="alan" style={{ flex: 1 }}>
+                                      <label>Bakım Başlama Tarihi</label>
+                                      <input
+                                        type="date"
+                                        value={durum.baslangic}
+                                        onChange={(e) =>
+                                          sablonTarihGuncelle(s.sablon_id, "baslangic", e.target.value)
+                                        }
+                                      />
+                                    </div>
+                                    <div className="alan" style={{ flex: 1 }}>
+                                      <label>Bakım Bitiş Tarihi (isteğe bağlı)</label>
+                                      <input
+                                        type="date"
+                                        value={durum.bitis}
+                                        onChange={(e) => sablonTarihGuncelle(s.sablon_id, "bitis", e.target.value)}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="aliciListesi">
+                                  {sahaPersoneli &&
+                                    sahaPersoneli.map((k) => (
+                                      <label key={k.kullanici_id} className="aliciSatiri">
+                                        <input
+                                          type="checkbox"
+                                          checked={durum.seciliKisiler.includes(k.kullanici_id)}
+                                          onChange={() => sablonKisiSecimiDegistir(s.sablon_id, k.kullanici_id)}
+                                        />
+                                        {k.ad_soyad}
+                                      </label>
+                                    ))}
+                                  {sahaPersoneli && sahaPersoneli.length === 0 && (
+                                    <div className="gorevAlt">Bu santrale erişimi olan saha personeli yok.</div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
