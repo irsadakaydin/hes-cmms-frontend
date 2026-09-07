@@ -308,11 +308,11 @@ export default function SantralDetaySayfasi() {
     );
   }
 
-  // Seçilen ekipmanın tipi VE seçilen periyoda göre şablon listesini anlık süzer
+  // Seçilen ekipmanın tipine göre şablon listesini anlık süzer — periyot,
+  // seçilen şablona göre otomatik belirlenir.
   const yeniPlanSeciliEkipman = (ekipmanlar || []).find((ek) => ek.ekipman_id === yeniPlan.ekipman_id);
   const sabitliSablonlar = (tumSablonlar || []).filter((sb) => {
     if (yeniPlanSeciliEkipman && sb.ekipman_tipi !== yeniPlanSeciliEkipman.tip) return false;
-    if (yeniPlan.periyot && sb.periyot_tipi !== yeniPlan.periyot) return false;
     return true;
   });
 
@@ -617,41 +617,45 @@ export default function SantralDetaySayfasi() {
                 </select>
               </div>
               <div className="alan">
-                <label>Periyot</label>
+                <label>
+                  Bakım şablonu — seçilen ekipman tipine göre süzülür{" "}
+                  <span className="kutuphaneEtiketi">— {santral.isletme_adi} Kütüphanesi</span>
+                </label>
                 <select
-                  value={yeniPlan.periyot}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, periyot: e.target.value, sablon_id: "" })}
+                  required
+                  value={yeniPlan.sablon_id}
+                  onChange={(e) => {
+                    const s = tumSablonlar.find((x) => x.sablon_id === e.target.value);
+                    setYeniPlan({
+                      ...yeniPlan,
+                      sablon_id: e.target.value,
+                      periyot: s ? s.periyot_tipi : yeniPlan.periyot,
+                    });
+                  }}
                 >
+                  <option value="">Seçin…</option>
+                  {sabitliSablonlar.map((s) => (
+                    <option key={s.sablon_id} value={s.sablon_id}>
+                      {s.ad} ({PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi})
+                    </option>
+                  ))}
+                </select>
+                {yeniPlan.ekipman_id && sabitliSablonlar.length === 0 && (
+                  <div className="kutuphaneBosUyari">
+                    Bu ekipman tipi için {santral.isletme_adi} kütüphanesinde henüz bir şablon yok —{" "}
+                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından ekleyin.
+                  </div>
+                )}
+              </div>
+              <div className="alan">
+                <label>Periyot — seçtiğiniz şablona göre otomatik dolar</label>
+                <select value={yeniPlan.periyot} disabled>
                   {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
                     <option key={deger} value={deger}>
                       {etiket}
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="alan">
-                <label>
-                  Bakım şablonu — seçilen ekipman ve periyoda göre süzülür{" "}
-                  <span className="kutuphaneEtiketi">— {santral.isletme_adi} Kütüphanesi</span>
-                </label>
-                <select
-                  required
-                  value={yeniPlan.sablon_id}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, sablon_id: e.target.value })}
-                >
-                  <option value="">Seçin…</option>
-                  {sabitliSablonlar.map((s) => (
-                    <option key={s.sablon_id} value={s.sablon_id}>
-                      {s.ad} ({s.ekipman_tipi})
-                    </option>
-                  ))}
-                </select>
-                {yeniPlan.ekipman_id && sabitliSablonlar.length === 0 && (
-                  <div className="kutuphaneBosUyari">
-                    Bu ekipman tipi + periyot için {santral.isletme_adi} kütüphanesinde henüz bir şablon yok —{" "}
-                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından ekleyin.
-                  </div>
-                )}
               </div>
               <div className="alan">
                 <label>Başlangıç tarihi</label>
