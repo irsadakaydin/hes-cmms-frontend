@@ -424,6 +424,11 @@ export default function SablonlarSayfasi() {
       setFormuAcik(false);
       setDuzenlenenSablonId(null);
       await verileriYukle();
+      // Alttaki "Klasöre göre görüntüle" bölümü kendi başına önbelleklediği
+      // için, bir şablon kaydedildiğinde/düzenlendiğinde onu da tazeleriz —
+      // aksi halde az önce yapılan değişiklik orada eski (bayat) haliyle
+      // görünmeye devam ederdi.
+      if (goruntuleSantralId) await goruntuleUniteleriGetir(goruntuleSantralId);
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -439,6 +444,7 @@ export default function SablonlarSayfasi() {
         : `/api/v1/bakim-sablonlari/${sablon.sablon_id}/aktiflestir`;
       await istekAt(yol, { method: "POST" });
       await verileriYukle();
+      if (goruntuleSantralId) await goruntuleUniteleriGetir(goruntuleSantralId);
     } catch (err) {
       setHata(err.message);
     }
@@ -450,6 +456,7 @@ export default function SablonlarSayfasi() {
     try {
       await istekAt(`/api/v1/bakim-sablonlari/${sablon.sablon_id}`, { method: "DELETE" });
       await verileriYukle();
+      if (goruntuleSantralId) await goruntuleUniteleriGetir(goruntuleSantralId);
     } catch (err) {
       setHata(err.message);
     }
@@ -529,9 +536,18 @@ export default function SablonlarSayfasi() {
             )}
 
             {goruntuleSantralId && (
-              <h3 style={{ marginTop: 0, marginBottom: "10px" }}>
-                {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
-              </h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ marginTop: 0, marginBottom: "10px" }}>
+                  {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
+                </h3>
+                <button
+                  type="button"
+                  className="linkButon"
+                  onClick={() => goruntuleUniteleriGetir(goruntuleSantralId)}
+                >
+                  ↻ Yenile
+                </button>
+              </div>
             )}
 
             {goruntuleSantralId && !goruntuleUniteleri && <div className="yukleniyor">Yükleniyor…</div>}
