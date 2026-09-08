@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, kullaniciAl, dosyaIndir } from "../lib/api";
-import KlasorGezgini from "../components/KlasorGezgini";
 import { excelDenSablonCikar } from "../lib/excelSablonImport";
 import UstBar from "../components/UstBar";
 
@@ -100,6 +99,9 @@ export default function SablonlarSayfasi() {
   const [duzenlenenSablonId, setDuzenlenenSablonId] = useState(null);
   const [acikKarekodId, setAcikKarekodId] = useState(null);
   const [klasorYolu, setKlasorYolu] = useState("");
+  const [sablonEkipmanId, setSablonEkipmanId] = useState("");
+  const [santralEkipmanlari, setSantralEkipmanlari] = useState(null);
+  const [sablonPeriyotYapraklari, setSablonPeriyotYapraklari] = useState(null);
   const [gercekEkipmanTipleri, setGercekEkipmanTipleri] = useState(null);
 
   const verileriYukle = useCallback(async () => {
@@ -152,6 +154,23 @@ export default function SablonlarSayfasi() {
       .then((v) => setGercekEkipmanTipleri(v.veri))
       .catch(() => setGercekEkipmanTipleri([]));
   }, [formuAcik, taslak.santral_id, taslak.isletme_id]);
+
+  // Şablon formunda Santral seçilince, o santraldeki MEVCUT ekipmanları
+  // getiriyoruz — artık şablon, ağaçta yeniden gezinmek yerine doğrudan
+  // önceden oluşturulmuş bir ekipmandan seçilir (ekipmanı olmayan bir
+  // konuma şablon yüklenemez).
+  useEffect(() => {
+    setSablonEkipmanId("");
+    setSablonPeriyotYapraklari(null);
+    setKlasorYolu("");
+    if (!formuAcik || !taslak.santral_id) {
+      setSantralEkipmanlari(null);
+      return;
+    }
+    istekAt(`/api/v1/santraller/${taslak.santral_id}/ekipmanlar`)
+      .then((v) => setSantralEkipmanlari(v.veri))
+      .catch((err) => setHata(err.message));
+  }, [formuAcik, taslak.santral_id]);
 
   const gosterilecekSantraller = (tumSantraller || []).filter(
     (s) => s.isletme_id === (platformAdminMi ? seciliHoldingId : kendiIsletmeId)
@@ -443,32 +462,79 @@ export default function SablonlarSayfasi() {
               </div>
 
               {taslak.santral_id ? (
-                <div className="alan">
-                  <label>
-                    Klasör konumu — bu şablonu bağlayacağınız periyot yaprağını seçin.
-                    {klasorYolu && <strong> Seçili: {klasorYolu}</strong>}
-                  </label>
-                  <KlasorGezgini
-                    santralId={taslak.santral_id}
-                    mod="sablon"
-                    seciliKlasorId={taslak.klasor_id}
-                    onSecim={async (k) => {
-                      setTaslak((t) => ({ ...t, klasor_id: k.klasor_id, periyot_tipi: k.periyot_tipi }));
-                      try {
-                        const yol = await istekAt(`/api/v1/klasorler/${k.klasor_id}/yol`);
-                        setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
-                      } catch {
-                        setKlasorYolu(k.ad);
-                      }
-                    }}
-                  />
-                  {taslak.klasor_id && (
-                    <div className="gorevAlt" style={{ marginTop: "6px" }}>
-                      Periyot bu klasörden otomatik geldi:{" "}
-                      {PERIYOT_ETIKETLERI[taslak.periyot_tipi] || taslak.periyot_tipi}
+                <>
+                  <div className="alan">
+                    <label>Ekipman — daha önce Ekipman Oluştur'da eklenmiş kayıtlardan seçin</label>
+                    <select
+                      required
+                      value={sablonEkipmanId}
+                      onChange={async (e) => {
+                        const ekipmanId = e.target.value;
+                        setSablonEkipmanId(ekipmanId);
+                        setTaslak((t) => ({ ...t, klasor_id: "", periyot_tipi: "" }));
+                        setKlasorYolu("");
+                        setSablonPeriyotYapraklari(null);
+                        const ek = (santralEkipmanlari || []).find((x) => x.ekipman_id === ekipmanId);
+                        if (ek && ek.klasor_id) {
+                          try {
+                            const veri = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/periyot-yapraklari`);
+                            setSablonPeriyotYapraklari(veri.veri);
+                            const yol = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/yol`);
+                            setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+                          } catch (err) {
+                            setHata(err.message);
+                          }
+                        }
+                      }}
+                    >
+                      <option value="">Seçin…</option>
+                      {(santralEkipmanlari || []).map((ek) => (
+                        <option key={ek.ekipman_id} value={ek.ekipman_id}>
+                          {ek.ad} ({ek.tip})
+                        </option>
+                      ))}
+                    </select>
+                    {santralEkipmanlari && santralEkipmanlari.length === 0 && (
+                      <div className="kutuphaneBosUyari">
+                        Bu santralde henüz ekipman yok — önce{" "}
+                        <a href="/ekipman-olustur">Ekipman Oluştur</a>'dan, klasör ağacından yerini seçerek ekleyin.
+                        Ekipmanı olmayan bir konuma şablon yüklenemez.
+                      </div>
+                    )}
+                    {klasorYolu && <div className="gorevAlt" style={{ marginTop: "6px" }}>Konum: {klasorYolu}</div>}
+                  </div>
+
+                  {sablonEkipmanId && (
+                    <div className="alan">
+                      <label>Periyot — bu ekipmanın klasöründeki periyotlardan seçin</label>
+                      <select
+                        required
+                        value={taslak.klasor_id}
+                        onChange={(e) => {
+                          const secilen = (sablonPeriyotYapraklari || []).find((p) => p.klasor_id === e.target.value);
+                          setTaslak((t) => ({
+                            ...t,
+                            klasor_id: e.target.value,
+                            periyot_tipi: secilen ? secilen.periyot_tipi : "",
+                          }));
+                        }}
+                      >
+                        <option value="">Seçin…</option>
+                        {(sablonPeriyotYapraklari || []).map((p) => (
+                          <option key={p.klasor_id} value={p.klasor_id}>
+                            {p.ad}
+                            {Number(p.sablon_sayisi) > 0 ? ` (${p.sablon_sayisi} şablon var)` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {sablonPeriyotYapraklari && sablonPeriyotYapraklari.length === 0 && (
+                        <div className="kutuphaneBosUyari">
+                          Bu ekipmanın klasöründe periyot tanımlı değil — klasör ağacınızı kontrol edin.
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               ) : (
                 <>
                   <div className="alan">
