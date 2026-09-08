@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
+import KlasorGezgini from "../components/KlasorGezgini";
 
 export default function EkipmanListesiSayfasi() {
   const router = useRouter();
@@ -14,6 +15,9 @@ export default function EkipmanListesiSayfasi() {
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [seciliSantralId, setSeciliSantralId] = useState("");
   const [ekipmanlar, setEkipmanlar] = useState(null);
+  const [tumListeModu, setTumListeModu] = useState(false); // false = klasörde gez, true = düz liste
+  const [seciliKlasorId, setSeciliKlasorId] = useState("");
+  const [klasorYolu, setKlasorYolu] = useState("");
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
   const [gonderiliyor, setGonderiliyor] = useState(false);
@@ -57,9 +61,38 @@ export default function EkipmanListesiSayfasi() {
     }
   }, []);
 
+  async function klasordekiEkipmanlariGetir(klasor) {
+    setSeciliKlasorId(klasor.klasor_id);
+    setHata(null);
+    try {
+      const [ekipmanSonuc, yol] = await Promise.all([
+        istekAt(`/api/v1/klasorler/${klasor.klasor_id}/ekipmanlar`),
+        istekAt(`/api/v1/klasorler/${klasor.klasor_id}/yol`),
+      ]);
+      setEkipmanlar(ekipmanSonuc.veri);
+      setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   useEffect(() => {
-    ekipmanlariGetir(seciliSantralId);
-  }, [seciliSantralId, ekipmanlariGetir]);
+    setSeciliKlasorId("");
+    setKlasorYolu("");
+    if (tumListeModu) {
+      ekipmanlariGetir(seciliSantralId);
+    } else {
+      setEkipmanlar(null);
+    }
+  }, [seciliSantralId, tumListeModu, ekipmanlariGetir]);
+
+  async function listeyiYenile() {
+    if (tumListeModu) {
+      await listeyiYenile();
+    } else if (seciliKlasorId) {
+      await klasordekiEkipmanlariGetir({ klasor_id: seciliKlasorId });
+    }
+  }
 
   function duzenlemeyiBaslat(e) {
     setDuzenlenenId(e.ekipman_id);
@@ -72,7 +105,7 @@ export default function EkipmanListesiSayfasi() {
     try {
       await istekAt(`/api/v1/ekipmanlar/${ekipmanId}`, { method: "PATCH", body: JSON.stringify(taslak) });
       setDuzenlenenId(null);
-      await ekipmanlariGetir(seciliSantralId);
+      await listeyiYenile();
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -85,7 +118,7 @@ export default function EkipmanListesiSayfasi() {
     try {
       await istekAt(`/api/v1/ekipmanlar/${ekipmanId}/pasiflestir`, { method: "POST" });
       setBilgi("Ekipman pasifleştirildi.");
-      await ekipmanlariGetir(seciliSantralId);
+      await listeyiYenile();
     } catch (err) {
       setHata(err.message);
     }
@@ -97,7 +130,7 @@ export default function EkipmanListesiSayfasi() {
     try {
       await istekAt(`/api/v1/ekipmanlar/${ekipmanId}`, { method: "DELETE" });
       setBilgi("Ekipman kalıcı olarak silindi.");
-      await ekipmanlariGetir(seciliSantralId);
+      await listeyiYenile();
     } catch (err) {
       setHata(err.message);
     }
@@ -107,7 +140,7 @@ export default function EkipmanListesiSayfasi() {
     setHata(null);
     try {
       await istekAt(`/api/v1/ekipmanlar/${ekipmanId}`, { method: "PATCH", body: JSON.stringify({ durum: "AKTIF" }) });
-      await ekipmanlariGetir(seciliSantralId);
+      await listeyiYenile();
     } catch (err) {
       setHata(err.message);
     }
@@ -177,9 +210,30 @@ export default function EkipmanListesiSayfasi() {
             <div className="bosDurum">Ekipmanları görmek için bir santral seçin.</div>
           )}
 
-          {seciliSantralId && !ekipmanlar && <div className="yukleniyor">Yükleniyor…</div>}
+          {seciliSantralId && (
+            <div style={{ marginBottom: "14px" }}>
+              <button type="button" className="linkButon" onClick={() => setTumListeModu((v) => !v)}>
+                {tumListeModu ? "← Klasörde gezerek bul" : "Tüm ekipmanları düz liste olarak göster →"}
+              </button>
+            </div>
+          )}
+
+          {seciliSantralId && !tumListeModu && (
+            <div className="alan">
+              <label>
+                Klasör konumu {klasorYolu && <strong>— Seçili: {klasorYolu}</strong>}
+              </label>
+              <KlasorGezgini santralId={seciliSantralId} mod="ekipman" onSecim={klasordekiEkipmanlariGetir} />
+            </div>
+          )}
+
+          {seciliSantralId && (tumListeModu || seciliKlasorId) && !ekipmanlar && (
+            <div className="yukleniyor">Yükleniyor…</div>
+          )}
           {seciliSantralId && ekipmanlar && ekipmanlar.length === 0 && (
-            <div className="bosDurum">Bu santralde henüz ekipman yok.</div>
+            <div className="bosDurum">
+              {tumListeModu ? "Bu santralde henüz ekipman yok." : "Bu klasör konumunda henüz ekipman yok."}
+            </div>
           )}
 
           {ekipmanlar &&
