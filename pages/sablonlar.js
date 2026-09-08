@@ -887,6 +887,15 @@ export default function SablonlarSayfasi() {
                                       Pasif
                                     </span>
                                   )}
+                                  {!s.klasor_id && (
+                                    <span
+                                      className="rozet rozet-GECIKTI"
+                                      style={{ marginLeft: 8 }}
+                                      title="Bu şablon henüz klasör ağacındaki bir Üniteye bağlı değil — Klasöre Göre Görüntüle bölümünde görünmez. Düzenleyip Ekipman/Periyot seçerek bağlayın."
+                                    >
+                                      ⚠ Klasöre bağlı değil
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="gorevAlt">
                                   {s.ekipman_adi ? `${s.ekipman_adi} — ` : ""}
