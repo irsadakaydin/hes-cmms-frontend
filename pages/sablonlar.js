@@ -101,13 +101,13 @@ export default function SablonlarSayfasi() {
   const [klasorYolu, setKlasorYolu] = useState("");
   const [sablonEkipmanId, setSablonEkipmanId] = useState("");
 
-  // ---- Klasöre göre şablon görüntüleme (yeni bölüm) ----
+  // ---- Klasöre göre şablon görüntüleme (sabit yol: Elektromekanik > Turbin > Türbin) ----
   const [goruntuleSantralId, setGoruntuleSantralId] = useState("");
-  const [goruntuleYol, setGoruntuleYol] = useState([]); // breadcrumb
-  const [goruntuleCocuklar, setGoruntuleCocuklar] = useState(null);
+  const [goruntuleUniteleri, setGoruntuleUniteleri] = useState(null); // [{klasor_id, ad}, ...]
   const [acikUniteler, setAcikUniteler] = useState({}); // klasor_id -> bool
   const [uniteSablonlari, setUniteSablonlari] = useState({}); // klasor_id -> [sablon]
   const [goruntuleHata, setGoruntuleHata] = useState(null);
+  const [goruntuleSantraller, setGoruntuleSantraller] = useState(null);
   const [santralEkipmanlari, setSantralEkipmanlari] = useState(null);
   const [sablonPeriyotYapraklari, setSablonPeriyotYapraklari] = useState(null);
   const [gercekEkipmanTipleri, setGercekEkipmanTipleri] = useState(null);
@@ -184,43 +184,54 @@ export default function SablonlarSayfasi() {
     (s) => s.isletme_id === (platformAdminMi ? seciliHoldingId : kendiIsletmeId)
   );
 
-  // ---- Klasöre göre şablon görüntüleme — gezinme fonksiyonları ----
-  const goruntuleCocuklariGetir = useCallback(async (santralId, ustId) => {
+  // ---- Klasöre göre şablon görüntüleme — sabit yolu (Elektromekanik >
+  // Turbin > Türbin) doğrudan bulup Ünite 1-4'ü yan yana gösterir; tek tek
+  // klasöre tıklayarak gezinmeye gerek yok.
+  const SABIT_YOL = ["Elektromekanik", "Turbin", "Türbin"];
+
+  const goruntuleUniteleriGetir = useCallback(async (santralId) => {
     if (!santralId) return;
-    setGoruntuleCocuklar(null);
+    setGoruntuleUniteleri(null);
+    setAcikUniteler({});
+    setUniteSablonlari({});
     setGoruntuleHata(null);
     try {
-      const p = ustId ? `?ust_klasor_id=${ustId}` : "";
-      const veri = await istekAt(`/api/v1/santraller/${santralId}/klasorler${p}`);
-      // Kök seviyede yalnızca Elektromekanik ve Hidromekanik gösterilsin —
-      // diğer klasör yolları daha sonra eklenecek.
-      const filtreli = ustId
-        ? veri.veri
-        : veri.veri.filter((k) => /elektromekanik|hidromekanik/i.test(k.ad));
-      setGoruntuleCocuklar(filtreli);
+      let ustId = null;
+      for (const adim of SABIT_YOL) {
+        const p = ustId ? `?ust_klasor_id=${ustId}` : "";
+        const veri = await istekAt(`/api/v1/santraller/${santralId}/klasorler${p}`);
+        const bulunan = veri.veri.find((k) => k.ad.toLowerCase() === adim.toLowerCase());
+        if (!bulunan) {
+          setGoruntuleUniteleri([]);
+          setGoruntuleHata(`Bu santralde "${SABIT_YOL.join(" > ")}" klasör yolu bulunamadı.`);
+          return;
+        }
+        ustId = bulunan.klasor_id;
+      }
+      const sonVeri = await istekAt(`/api/v1/santraller/${santralId}/klasorler?ust_klasor_id=${ustId}`);
+      setGoruntuleUniteleri(sonVeri.veri);
     } catch (err) {
       setGoruntuleHata(err.message);
     }
   }, []);
 
   useEffect(() => {
-    setGoruntuleYol([]);
-    setAcikUniteler({});
-    setUniteSablonlari({});
-    if (goruntuleSantralId) goruntuleCocuklariGetir(goruntuleSantralId, null);
-    else setGoruntuleCocuklar(null);
-  }, [goruntuleSantralId, goruntuleCocuklariGetir]);
+    if (goruntuleSantralId) goruntuleUniteleriGetir(goruntuleSantralId);
+    else setGoruntuleUniteleri(null);
+  }, [goruntuleSantralId, goruntuleUniteleriGetir]);
 
-  function goruntuleIcineGir(k) {
-    setGoruntuleYol((y) => [...y, { klasor_id: k.klasor_id, ad: k.ad }]);
-    goruntuleCocuklariGetir(goruntuleSantralId, k.klasor_id);
-  }
-
-  function goruntuleBreadcrumbaGit(index) {
-    const yeniYol = index < 0 ? [] : goruntuleYol.slice(0, index + 1);
-    setGoruntuleYol(yeniYol);
-    goruntuleCocuklariGetir(goruntuleSantralId, yeniYol.length > 0 ? yeniYol[yeniYol.length - 1].klasor_id : null);
-  }
+  // Görüntüleme bölümü için erişilebilir santralleri getirir; yönetici
+  // yalnızca tek santrale tanımlıysa o santral otomatik seçilir.
+  useEffect(() => {
+    istekAt("/api/v1/santraller")
+      .then((veri) => {
+        setGoruntuleSantraller(veri.veri);
+        if (!platformAdminMi && veri.veri.length === 1) {
+          setGoruntuleSantralId(veri.veri[0].santral_id);
+        }
+      })
+      .catch((err) => setGoruntuleHata(err.message));
+  }, []);
 
   async function uniteAcKapa(k) {
     const acikMi = !!acikUniteler[k.klasor_id];
@@ -234,17 +245,6 @@ export default function SablonlarSayfasi() {
       }
     }
   }
-
-  function goruntuleKartaTiklaninca(k) {
-    // Ünite düzeyi (alt_periyot_mu = true) ise iç e girmek yerine
-    // açılır/kapanır listeyi tetikle; değilse normal şekilde içine gir.
-    if (k.alt_periyot_mu) {
-      uniteAcKapa(k);
-    } else if (Number(k.alt_sayisi) > 0) {
-      goruntuleIcineGir(k);
-    }
-  }
-
 
   function grupAnahtari(santralId, periyot) {
     return `${santralId || "genel"}|${periyot}`;
@@ -482,106 +482,84 @@ export default function SablonlarSayfasi() {
           {bilgi && <div className="basariliKutu">{bilgi}</div>}
 
           <div className="yonetimFormu" style={{ background: "var(--surface)" }}>
-            <h3 style={{ marginTop: 0 }}>Şablonları Klasöre Göre Görüntüle</h3>
-            <div className="alan" style={{ maxWidth: "340px" }}>
-              <label>Santral</label>
-              <select value={goruntuleSantralId} onChange={(e) => setGoruntuleSantralId(e.target.value)}>
-                <option value="">Seçin…</option>
-                {(tumSantraller || [])
-                  .filter((s) => !platformAdminMi || s.isletme_id === seciliHoldingId)
-                  .map((s) => (
+            <h3 style={{ marginTop: 0 }}>
+              Şablonları Klasöre Göre Görüntüle
+              <span className="gorevAlt" style={{ fontWeight: 400 }}>
+                {" "}
+                — {SABIT_YOL.join(" > ")} &gt; Ünite
+              </span>
+            </h3>
+
+            {goruntuleSantraller && goruntuleSantraller.length > 1 && (
+              <div className="alan" style={{ maxWidth: "340px" }}>
+                <label>Santral</label>
+                <select value={goruntuleSantralId} onChange={(e) => setGoruntuleSantralId(e.target.value)}>
+                  <option value="">Seçin…</option>
+                  {goruntuleSantraller.map((s) => (
                     <option key={s.santral_id} value={s.santral_id}>
                       {s.ad}
                     </option>
                   ))}
-              </select>
-            </div>
-
-            {goruntuleSantralId && (
-              <>
-                <div className="klasorBreadcrumb">
-                  <button
-                    type="button"
-                    className={goruntuleYol.length === 0 ? "klasorBreadcrumbAktif" : "klasorBreadcrumbAdim"}
-                    onClick={() => goruntuleBreadcrumbaGit(-1)}
-                  >
-                    {(tumSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad || "Santral"}
-                  </button>
-                  {goruntuleYol.map((k, i) => (
-                    <span key={k.klasor_id} style={{ display: "inline-flex", alignItems: "center" }}>
-                      <span className="klasorBreadcrumbAyrac">/</span>
-                      <button
-                        type="button"
-                        className={i === goruntuleYol.length - 1 ? "klasorBreadcrumbAktif" : "klasorBreadcrumbAdim"}
-                        onClick={() => goruntuleBreadcrumbaGit(i)}
-                      >
-                        {k.ad}
-                      </button>
-                    </span>
-                  ))}
-                </div>
-
-                {!goruntuleCocuklar && <div className="yukleniyor">Yükleniyor…</div>}
-
-                {goruntuleCocuklar && goruntuleCocuklar.length > 0 && (
-                  <div className="klasorKartIzgara">
-                    {goruntuleCocuklar.map((k) => (
-                      <div key={k.klasor_id} className="klasorKart">
-                        <button
-                          type="button"
-                          className="klasorKartGovde"
-                          onClick={() => goruntuleKartaTiklaninca(k)}
-                        >
-                          <svg className="klasorKartIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                              d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11.5 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                          <span className="klasorKartAd">{k.ad}</span>
-                          {k.alt_periyot_mu && (
-                            <span className="klasorKartEtiket">
-                              {acikUniteler[k.klasor_id] ? "▾ listeyi kapat" : "▸ listeyi aç"}
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {goruntuleCocuklar && goruntuleCocuklar.length === 0 && (
-                  <div className="bosDurum">Bu klasörün altında başka klasör yok.</div>
-                )}
-
-                {/* Ünite düzeyindeki açık listeler, kart ızgarasının altında tek tek gösterilir */}
-                {goruntuleCocuklar &&
-                  goruntuleCocuklar
-                    .filter((k) => k.alt_periyot_mu && acikUniteler[k.klasor_id])
-                    .map((k) => (
-                      <div key={k.klasor_id} style={{ marginTop: "10px" }}>
-                        <div className="gorevAlt" style={{ fontWeight: 700, marginBottom: "6px" }}>
-                          {k.ad} — Bakım Şablonları
-                        </div>
-                        {!uniteSablonlari[k.klasor_id] && <div className="yukleniyor">Yükleniyor…</div>}
-                        {uniteSablonlari[k.klasor_id] && uniteSablonlari[k.klasor_id].length === 0 && (
-                          <div className="bosDurum">Bu ünite için henüz bir bakım şablonu yüklenmemiş.</div>
-                        )}
-                        {uniteSablonlari[k.klasor_id] &&
-                          uniteSablonlari[k.klasor_id].map((s) => (
-                            <div className="satirKart" key={s.sablon_id}>
-                              <strong>{s.ad}</strong>
-                              <div className="gorevAlt">
-                                {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    ))}
-              </>
+                </select>
+              </div>
             )}
+
+            {!goruntuleSantraller && <div className="yukleniyor">Yükleniyor…</div>}
+            {goruntuleSantraller && goruntuleSantraller.length > 1 && !goruntuleSantralId && (
+              <div className="bosDurum">Görmek için bir santral seçin.</div>
+            )}
+
+            {goruntuleSantralId && !goruntuleUniteleri && <div className="yukleniyor">Yükleniyor…</div>}
+
+            {goruntuleUniteleri && goruntuleUniteleri.length > 0 && (
+              <div className="klasorKartIzgara">
+                {goruntuleUniteleri.map((k) => (
+                  <div key={k.klasor_id} className="klasorKart">
+                    <button type="button" className="klasorKartGovde" onClick={() => uniteAcKapa(k)}>
+                      <svg className="klasorKartIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11.5 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span className="klasorKartAd">{k.ad}</span>
+                      <span className="klasorKartEtiket">
+                        {acikUniteler[k.klasor_id] ? "▾ listeyi kapat" : "▸ listeyi aç"}
+                      </span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && (
+              <div className="bosDurum">Bu yolda ünite klasörü bulunamadı.</div>
+            )}
+
+            {/* Açık ünitelerin şablon listeleri, kart ızgarasının altında tek tek gösterilir */}
+            {goruntuleUniteleri &&
+              goruntuleUniteleri
+                .filter((k) => acikUniteler[k.klasor_id])
+                .map((k) => (
+                  <div key={k.klasor_id} style={{ marginTop: "10px" }}>
+                    <div className="gorevAlt" style={{ fontWeight: 700, marginBottom: "6px" }}>
+                      {k.ad} — Bakım Şablonları
+                    </div>
+                    {!uniteSablonlari[k.klasor_id] && <div className="yukleniyor">Yükleniyor…</div>}
+                    {uniteSablonlari[k.klasor_id] && uniteSablonlari[k.klasor_id].length === 0 && (
+                      <div className="bosDurum">Bu ünite için henüz bir bakım şablonu yüklenmemiş.</div>
+                    )}
+                    {uniteSablonlari[k.klasor_id] &&
+                      uniteSablonlari[k.klasor_id].map((s) => (
+                        <div className="satirKart" key={s.sablon_id}>
+                          <strong>{s.ad}</strong>
+                          <div className="gorevAlt">{PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}</div>
+                        </div>
+                      ))}
+                  </div>
+                ))}
           </div>
 
           {platformAdminMi && (
