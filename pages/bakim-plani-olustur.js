@@ -220,7 +220,8 @@ export default function BakimPlaniOlusturSayfasi() {
                       {ekipmanlar &&
                         ekipmanlar.map((ek) => (
                           <option key={ek.ekipman_id} value={ek.ekipman_id}>
-                            {ek.ad} ({ek.tip})
+                            {ek.unite_no ? `${ek.unite_no} ` : ""}
+                            {ek.ad} - ({ek.tip})
                           </option>
                         ))}
                     </select>
