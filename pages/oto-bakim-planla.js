@@ -153,6 +153,9 @@ export default function OtoBakimPlanlaSayfasi() {
           body: JSON.stringify(govde),
         });
         toplamOlusturulan += sonuc.olusturulan_sayisi || 0;
+        if (!sonuc.olusturulan_sayisi) {
+          hatalar.push(sonuc.mesaj);
+        }
       } catch (err) {
         if (err.hata_kodu === "MUKERRER_TESPIT_EDILDI") {
           const tekrarGonderilsinMi = confirm(
