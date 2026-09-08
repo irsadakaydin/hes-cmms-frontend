@@ -133,6 +133,7 @@ export default function EkipmanOlusturSayfasi() {
                       </label>
                       <KlasorGezgini
                         santralId={taslak.santral_id}
+                        santralAdi={(gosterilecekSantraller || []).find((s) => s.santral_id === taslak.santral_id)?.ad}
                         mod="ekipman"
                         seciliKlasorId={taslak.klasor_id}
                         onSecim={async (k) => {

@@ -223,7 +223,12 @@ export default function EkipmanListesiSayfasi() {
               <label>
                 Klasör konumu {klasorYolu && <strong>— Seçili: {klasorYolu}</strong>}
               </label>
-              <KlasorGezgini santralId={seciliSantralId} mod="ekipman" onSecim={klasordekiEkipmanlariGetir} />
+              <KlasorGezgini
+                santralId={seciliSantralId}
+                santralAdi={(santraller || []).find((s) => s.santral_id === seciliSantralId)?.ad}
+                mod="ekipman"
+                onSecim={klasordekiEkipmanlariGetir}
+              />
             </div>
           )}
 
