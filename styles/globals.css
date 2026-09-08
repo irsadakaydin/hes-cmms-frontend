@@ -1149,9 +1149,11 @@ h1, h2, h3 {
 
 .klasorKartIzgara {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 10px;
   margin-bottom: 12px;
+  padding-bottom: 6px;
 }
 
 .klasorKart {
@@ -1160,6 +1162,7 @@ h1, h2, h3 {
   align-items: stretch;
   gap: 6px;
   width: 132px;
+  flex-shrink: 0;
 }
 
 .klasorKartGovde {
@@ -1167,27 +1170,27 @@ h1, h2, h3 {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  background: #fff;
-  border: 1.5px solid var(--line-strong);
+  background: radial-gradient(circle at 35% 30%, #f2c98a, #c17a24);
+  border: 1.5px solid #a8681c;
   border-radius: 12px;
   padding: 14px 8px 10px;
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, filter 0.2s ease;
 }
 .klasorKartGovde:hover {
-  border-color: var(--teal-deep);
-  box-shadow: 0 4px 14px rgba(11, 46, 47, 0.14);
+  box-shadow: 0 6px 16px rgba(161, 100, 28, 0.35);
   transform: translateY(-2px);
+  filter: brightness(1.05);
 }
 .klasorKartGovdeSecili {
   border-color: var(--teal-deep);
-  background: var(--paper);
+  box-shadow: 0 0 0 2px var(--teal-deep);
 }
 
 .klasorKartIkon {
   width: 30px;
   height: 30px;
-  color: var(--amber);
+  color: #fff;
   flex-shrink: 0;
   transition: transform 0.2s ease;
 }
@@ -1197,16 +1200,17 @@ h1, h2, h3 {
 
 .klasorKartAd {
   font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink);
+  font-weight: 700;
+  color: #fff;
   text-align: center;
   line-height: 1.25;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .klasorKartEtiket {
   font-size: 10.5px;
-  color: var(--ink-soft);
-  background: var(--surface);
+  color: #5b3a10;
+  background: rgba(255, 255, 255, 0.75);
   border-radius: 999px;
   padding: 1px 8px;
 }
