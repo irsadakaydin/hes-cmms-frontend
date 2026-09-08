@@ -113,6 +113,30 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
     }
   }
 
+  async function klasoruSil(k) {
+    if (!confirm(`"${k.ad}" klasörünü silmek istediğinize emin misiniz? Altındaki tüm alt klasörler de silinecek.`)) {
+      return;
+    }
+    setHata(null);
+    try {
+      await istekAt(`/api/v1/klasorler/${k.klasor_id}`, { method: "DELETE" });
+      await cocuklariGetir(suankiKlasorId);
+    } catch (err) {
+      if (err.hata_kodu === "KLASOR_DOLU") {
+        if (confirm(err.message)) {
+          try {
+            await istekAt(`/api/v1/klasorler/${k.klasor_id}?zorla=1`, { method: "DELETE" });
+            await cocuklariGetir(suankiKlasorId);
+          } catch (err2) {
+            setHata(err2.message);
+          }
+        }
+      } else {
+        setHata(err.message);
+      }
+    }
+  }
+
   return (
     <div className="yonetimFormu" style={{ background: "var(--surface)" }}>
       {hata && <div className="hataKutusu">{hata}</div>}
@@ -192,6 +216,9 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
                   {seciliKlasorId === k.klasor_id ? "✓ Seçili" : "Bunu Seç"}
                 </button>
               )}
+              <button type="button" className="klasorSilButon" onClick={() => klasoruSil(k)} title="Klasörü sil">
+                🗑 Klasörü Sil
+              </button>
             </div>
           ))}
         </div>
