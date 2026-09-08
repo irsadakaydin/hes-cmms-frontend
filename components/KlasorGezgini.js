@@ -3,17 +3,16 @@ import { istekAt } from "../lib/api";
 
 /**
  * Klasör Gezgini — santral altındaki hiyerarşik ekipman/periyot klasör
- * ağacında gezinmeyi sağlar. Aynı anda tek bir seviyeyi listeler (hepsi alt
- * alta dökülmez), üst klasöre dönmek için breadcrumb kullanılır.
+ * ağacında gezinmeyi sağlar. Her seviye, soldan sağa dizilmiş sabit,
+ * yumuşak geçişli kartlar olarak gösterilir. Bir karta tıklamak doğrudan
+ * içine girer; kartın altındaki "Bunu Seç" ise (yalnızca uygun kartlarda)
+ * o düğümü seçer. Üst seviyeye dönmek için breadcrumb kullanılır — en
+ * baştaki isim santralin adıdır.
  *
- * mod="ekipman"  → yalnızca PERİYOT OLMAYAN düğümler seçilebilir (ekipman
- *                  buraya bağlanır, tipik olarak bir "Ünite" düzeyi).
- * mod="sablon"   → yalnızca PERİYOT YAPRAKLARI (Haftalık/Aylık/vb.)
- *                  seçilebilir (şablon buraya yüklenir).
- *
- * onSecim(klasor) — kullanıcı uygun bir düğümü seçtiğinde çağrılır.
+ * mod="ekipman"  → yalnızca PERİYOT OLMAYAN düğümler seçilebilir.
+ * mod="sablon"   → yalnızca PERİYOT YAPRAKLARI seçilebilir.
  */
-export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId }) {
+export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, seciliKlasorId }) {
   const [yol, setYol] = useState([]); // breadcrumb: [{klasor_id, ad}, ...]
   const [cocuklar, setCocuklar] = useState(null);
   const [hata, setHata] = useState(null);
@@ -23,6 +22,7 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
   const [kurulumOneriliyor, setKurulumOneriliyor] = useState(false);
 
   const suankiKlasorId = yol.length > 0 ? yol[yol.length - 1].klasor_id : null;
+  const kokAdi = santralAdi || "Santral";
 
   const cocuklariGetir = useCallback(
     async (ustId) => {
@@ -53,7 +53,7 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
   }
 
   function breadcrumbaGit(index) {
-    // index=-1 → kök
+    // index=-1 → kök (santral)
     const yeniYol = index < 0 ? [] : yol.slice(0, index + 1);
     setYol(yeniYol);
     cocuklariGetir(yeniYol.length > 0 ? yeniYol[yeniYol.length - 1].klasor_id : null);
@@ -62,7 +62,15 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
 
   function secilebilirMi(klasor) {
     if (mod === "sablon") return !!klasor.periyot_tipi;
-    return !klasor.periyot_tipi; // ekipman modunda periyot yaprakları seçilemez
+    return !klasor.periyot_tipi;
+  }
+
+  function kartaTiklaninca(k) {
+    if (Number(k.alt_sayisi) > 0) {
+      icineGir(k);
+    } else if (secilebilirMi(k)) {
+      onSecim(k);
+    }
   }
 
   async function yeniKlasorEkle(e) {
@@ -102,23 +110,20 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
     <div className="yonetimFormu" style={{ background: "var(--surface)" }}>
       {hata && <div className="hataKutusu">{hata}</div>}
 
-      <div style={{ marginBottom: "10px", fontSize: "13.5px" }}>
+      <div className="klasorBreadcrumb">
         <button
           type="button"
-          className="linkButon"
-          style={{ fontWeight: yol.length === 0 ? 700 : 400 }}
+          className={yol.length === 0 ? "klasorBreadcrumbAktif" : "klasorBreadcrumbAdim"}
           onClick={() => breadcrumbaGit(-1)}
         >
-          Kök
+          {kokAdi}
         </button>
         {yol.map((k, i) => (
-          <span key={k.klasor_id}>
-            {" "}
-            /{" "}
+          <span key={k.klasor_id} style={{ display: "inline-flex", alignItems: "center" }}>
+            <span className="klasorBreadcrumbAyrac">/</span>
             <button
               type="button"
-              className="linkButon"
-              style={{ fontWeight: i === yol.length - 1 ? 700 : 400 }}
+              className={i === yol.length - 1 ? "klasorBreadcrumbAktif" : "klasorBreadcrumbAdim"}
               onClick={() => breadcrumbaGit(i)}
             >
               {k.ad}
@@ -139,45 +144,41 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
       {!cocuklar && !kurulumOneriliyor && <div className="yukleniyor">Yükleniyor…</div>}
 
       {cocuklar && cocuklar.length > 0 && (
-        <div>
+        <div className="klasorKartIzgara">
           {cocuklar.map((k) => (
-            <div
-              key={k.klasor_id}
-              className="satirKart"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: seciliKlasorId === k.klasor_id ? "var(--paper)" : undefined,
-              }}
-            >
-              <div>
-                <strong>{k.ad}</strong>
-                {k.periyot_tipi && <span className="gorevAlt"> — periyot yaprağı</span>}
+            <div key={k.klasor_id} className="klasorKart">
+              <button
+                type="button"
+                className={`klasorKartGovde ${seciliKlasorId === k.klasor_id ? "klasorKartGovdeSecili" : ""}`}
+                onClick={() => kartaTiklaninca(k)}
+                title={Number(k.alt_sayisi) > 0 ? "İçine girmek için tıklayın" : k.ad}
+              >
+                <svg className="klasorKartIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11.5 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="klasorKartAd">{k.ad}</span>
+                {k.periyot_tipi && <span className="klasorKartEtiket">periyot</span>}
                 {mod === "ekipman" && Number(k.ekipman_sayisi) > 0 && (
-                  <span className="gorevAlt"> · {k.ekipman_sayisi} ekipman bağlı</span>
+                  <span className="klasorKartEtiket">{k.ekipman_sayisi} ekipman</span>
                 )}
                 {mod === "sablon" && k.periyot_tipi && Number(k.sablon_sayisi) > 0 && (
-                  <span className="gorevAlt"> · {k.sablon_sayisi} şablon var</span>
+                  <span className="klasorKartEtiket">{k.sablon_sayisi} şablon</span>
                 )}
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {secilebilirMi(k) && (
-                  <button
-                    type="button"
-                    className={seciliKlasorId === k.klasor_id ? "klasorSecButonAktif" : "klasorSecButon"}
-                    onClick={() => onSecim(k)}
-                  >
-                    {seciliKlasorId === k.klasor_id ? "✓ Seçili" : "Bunu Seç"}
-                  </button>
-                )}
-                {Number(k.alt_sayisi) > 0 && (
-                  <button type="button" className="klasorIcineGirButon" onClick={() => icineGir(k)}>
-                    İçine Gir <span className="klasorIcineGirSayisi">{k.alt_sayisi}</span>
-                    <span className="klasorIcineGirOk">›</span>
-                  </button>
-                )}
-              </div>
+              </button>
+              {secilebilirMi(k) && (
+                <button
+                  type="button"
+                  className={seciliKlasorId === k.klasor_id ? "klasorSecButonAktif" : "klasorSecButon"}
+                  onClick={() => onSecim(k)}
+                >
+                  {seciliKlasorId === k.klasor_id ? "✓ Seçili" : "Bunu Seç"}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -196,7 +197,7 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
           ) : (
             <form onSubmit={yeniKlasorEkle} style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
               <div className="alan" style={{ flex: 1, marginBottom: 0 }}>
-                <label>Yeni klasör adı (bu seviyeye eklenir: {yol.length > 0 ? yol[yol.length - 1].ad : "Kök"})</label>
+                <label>Yeni klasör adı (bu seviyeye eklenir: {yol.length > 0 ? yol[yol.length - 1].ad : kokAdi})</label>
                 <input
                   autoFocus
                   value={yeniKlasorAdi}

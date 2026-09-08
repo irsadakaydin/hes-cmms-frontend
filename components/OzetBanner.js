@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import { istekAt, platformAdminMi } from "../lib/api";
 
@@ -57,8 +57,6 @@ export default function OzetBanner() {
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
 
   const [donem, setDonem] = useState("AYLIK");
-  const [donemMenuAcik, setDonemMenuAcik] = useState(false);
-  const donemMenuRef = useRef(null);
   const [ozelBaslangic, setOzelBaslangic] = useState("");
   const [ozelBitis, setOzelBitis] = useState("");
   const [holdingler, setHoldingler] = useState(null);
@@ -72,16 +70,6 @@ export default function OzetBanner() {
         .then((veri) => setHoldingler(veri.veri))
         .catch((err) => setHata(err.message));
     }
-  }, []);
-
-  useEffect(() => {
-    function disariTiklaninca(e) {
-      if (donemMenuRef.current && !donemMenuRef.current.contains(e.target)) {
-        setDonemMenuAcik(false);
-      }
-    }
-    document.addEventListener("mousedown", disariTiklaninca);
-    return () => document.removeEventListener("mousedown", disariTiklaninca);
   }, []);
 
   const yukle = useCallback(async () => {
@@ -124,48 +112,40 @@ export default function OzetBanner() {
           </>
         )}
         <label>Dönem</label>
-        <div className="donemSeciciSarmalayici" ref={donemMenuRef}>
+        <div className="donemIzgara">
+          {["GUNLUK", "HAFTALIK", "AYLIK", "YILLIK"].map((deger) => (
+            <button
+              key={deger}
+              type="button"
+              className={`donemKarti ${donem === deger ? "donemKartiAktif" : ""}`}
+              onClick={() => setDonem(deger)}
+            >
+              <svg className="donemKartiIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M3.5 9.5H20.5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M8 3V6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <path d="M16 3V6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <circle cx="8" cy="13.5" r="1.2" fill="currentColor" />
+                <circle cx="12" cy="13.5" r="1.2" fill="currentColor" />
+                <circle cx="16" cy="13.5" r="1.2" fill="currentColor" />
+              </svg>
+              <span>{DONEM_ETIKETLERI[deger]}</span>
+            </button>
+          ))}
           <button
             type="button"
-            className="donemSeciciButon"
-            onClick={() => setDonemMenuAcik((v) => !v)}
-            aria-expanded={donemMenuAcik}
+            className={`donemKarti donemKartiOzel ${donem === "OZEL" ? "donemKartiAktif" : ""}`}
+            onClick={() => setDonem("OZEL")}
           >
-            <svg className="donemSeciciIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="donemKartiIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
               <path d="M3.5 9.5H20.5" stroke="currentColor" strokeWidth="1.6" />
               <path d="M8 3V6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               <path d="M16 3V6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <circle cx="8" cy="13.5" r="1.2" fill="currentColor" />
-              <circle cx="12" cy="13.5" r="1.2" fill="currentColor" />
-              <circle cx="16" cy="13.5" r="1.2" fill="currentColor" />
+              <path d="M8 14L11 17L16 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span>{DONEM_ETIKETLERI[donem]}</span>
-            <svg
-              className={`donemSeciciOk ${donemMenuAcik ? "donemSeciciOkAcik" : ""}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <span>Tarih Seç…</span>
           </button>
-          <div className={`donemSeciciMenu ${donemMenuAcik ? "donemSeciciMenuAcik" : ""}`}>
-            {Object.entries(DONEM_ETIKETLERI).map(([deger, etiket]) => (
-              <button
-                type="button"
-                key={deger}
-                className={`donemSeciciSecenek ${donem === deger ? "donemSeciciSecenekAktif" : ""}`}
-                onClick={() => {
-                  setDonem(deger);
-                  setDonemMenuAcik(false);
-                }}
-              >
-                {etiket}
-                {donem === deger && <span className="donemSeciciTik">✓</span>}
-              </button>
-            ))}
-          </div>
         </div>
         {donem === "OZEL" && (
           <div className="ozetBannerTarihler">
