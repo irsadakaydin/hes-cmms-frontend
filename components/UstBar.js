@@ -40,7 +40,7 @@ export default function UstBar() {
       <div className="ustBar">
         <div className="ustBarSol">
           <div className="ustBarBaslik">
-            HES CMMS <small>Bakım Yönetim Sistemi</small>
+            Bakım Yönetim Sistemi
           </div>
           <nav className="ustBarNav">
             <Link href="/gorevler">Görevlerim</Link>
