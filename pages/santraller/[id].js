@@ -417,20 +417,20 @@ export default function SantralDetaySayfasi() {
           {ekipmanFormuAcik && (
             <form onSubmit={ekipmanEkle} className="yonetimFormu">
               <div className="alan">
+                <label>Ünite No (isteğe bağlı)</label>
+                <input
+                  value={yeniEkipman.unite_no}
+                  onChange={(e) => setYeniEkipman({ ...yeniEkipman, unite_no: e.target.value })}
+                  placeholder="Ör. Ünite 1"
+                />
+              </div>
+              <div className="alan">
                 <label>Ekipman adı</label>
                 <input
                   required
                   value={yeniEkipman.ad}
                   onChange={(e) => setYeniEkipman({ ...yeniEkipman, ad: e.target.value })}
                   placeholder="Ör. Türbin 2"
-                />
-              </div>
-              <div className="alan">
-                <label>Ünite No (isteğe bağlı)</label>
-                <input
-                  value={yeniEkipman.unite_no}
-                  onChange={(e) => setYeniEkipman({ ...yeniEkipman, unite_no: e.target.value })}
-                  placeholder="Ör. Ünite 1"
                 />
               </div>
               <div className="alan">
@@ -472,18 +472,18 @@ export default function SantralDetaySayfasi() {
               duzenlenenEkipman?.ekipman_id === e.ekipman_id ? (
                 <form onSubmit={ekipmaniGuncelle} className="yonetimFormu" key={e.ekipman_id}>
                   <div className="alan">
+                    <label>Ünite No</label>
+                    <input
+                      value={duzenlenenEkipman.unite_no || ""}
+                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, unite_no: ev.target.value })}
+                    />
+                  </div>
+                  <div className="alan">
                     <label>Ekipman adı</label>
                     <input
                       required
                       value={duzenlenenEkipman.ad}
                       onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, ad: ev.target.value })}
-                    />
-                  </div>
-                  <div className="alan">
-                    <label>Ünite No</label>
-                    <input
-                      value={duzenlenenEkipman.unite_no || ""}
-                      onChange={(ev) => setDuzenlenenEkipman({ ...duzenlenenEkipman, unite_no: ev.target.value })}
                     />
                   </div>
                   <div className="alan">
@@ -526,7 +526,7 @@ export default function SantralDetaySayfasi() {
                 <div className="satirKart" key={e.ekipman_id}>
                   <div>
                     <strong>
-                      {e.unite_no ? `Ünite ${e.unite_no} ` : ""}
+                      {e.unite_no ? `${e.unite_no} ` : ""}
                       {e.ad}
                     </strong>{" "}
                     - ({e.tip})
