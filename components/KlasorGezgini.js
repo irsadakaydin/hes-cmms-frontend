@@ -163,13 +163,18 @@ export default function KlasorGezgini({ santralId, mod, onSecim, seciliKlasorId 
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 {secilebilirMi(k) && (
-                  <button type="button" className="linkButon" onClick={() => onSecim(k)}>
+                  <button
+                    type="button"
+                    className={seciliKlasorId === k.klasor_id ? "klasorSecButonAktif" : "klasorSecButon"}
+                    onClick={() => onSecim(k)}
+                  >
                     {seciliKlasorId === k.klasor_id ? "✓ Seçili" : "Bunu Seç"}
                   </button>
                 )}
                 {Number(k.alt_sayisi) > 0 && (
-                  <button type="button" className="linkButon" onClick={() => icineGir(k)}>
-                    İçine Gir ({k.alt_sayisi}) →
+                  <button type="button" className="klasorIcineGirButon" onClick={() => icineGir(k)}>
+                    İçine Gir <span className="klasorIcineGirSayisi">{k.alt_sayisi}</span>
+                    <span className="klasorIcineGirOk">›</span>
                   </button>
                 )}
               </div>
