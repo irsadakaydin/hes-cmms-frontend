@@ -31,7 +31,9 @@ const TIP_ETIKETLERI = {
 function bosSablon(varsayilanIsletmeId, varsayilanSantralId) {
   return {
     ad: "",
+    ekipman_adi: "",
     ekipman_tipi: "",
+    unite_no: "",
     periyot_tipi: "AYLIK",
     kalemler: [],
     isletme_id: varsayilanIsletmeId,
@@ -39,6 +41,13 @@ function bosSablon(varsayilanIsletmeId, varsayilanSantralId) {
   };
 }
 
+// Excel/PDF içe aktarmada da kullanılan, en sık karşılaşılan ekipman adı
+// (genel kategori) listesi — yazım hatasını önlemek için açılır kutu/öneri
+// olarak sunulur, ama "datalist" olduğu için gerekirse serbest de yazılabilir.
+const EKIPMAN_ADI_ONERILERI = [
+  "Türbin", "Jeneratör", "Trafo", "Transformatör", "Vana",
+  "Aktüatör", "Pompa", "Kompresör", "Şalt", "Kapak",
+];
 function bosKalem(sira) {
   return { id: `k${sira}`, soru: "", tip: "evet_hayir", birim: "", zorunlu: true };
 }
@@ -88,6 +97,7 @@ export default function SablonlarSayfasi() {
   const [taslak, setTaslak] = useState(bosSablon(kendiIsletmeId));
   const [duzenlenenSablonId, setDuzenlenenSablonId] = useState(null);
   const [acikKarekodId, setAcikKarekodId] = useState(null);
+  const [gercekEkipmanTipleri, setGercekEkipmanTipleri] = useState(null);
 
   const verileriYukle = useCallback(async () => {
     try {
@@ -125,6 +135,21 @@ export default function SablonlarSayfasi() {
     verileriYukle();
   }, [verileriYukle, router]);
 
+  // Şablon formundaki "Ekipman Tipi" önerilerini, seçilen santral/holding
+  // kapsamında GERÇEKTEN kayıtlı olan ekipman tipleriyle dolduruyoruz —
+  // böylece yazım hatası/farklı büyük-küçük harf yüzünden şablonun hiçbir
+  // ekipmanla eşleşmemesi (ve dolayısıyla oto-planlamada "0 plan
+  // oluşturuldu" çıkması) önlenir.
+  useEffect(() => {
+    if (!formuAcik) return;
+    const p = new URLSearchParams();
+    if (taslak.santral_id) p.set("santral_id", taslak.santral_id);
+    else if (taslak.isletme_id) p.set("isletme_id", taslak.isletme_id);
+    istekAt(`/api/v1/bakim-sablonlari/ekipman-tipleri?${p.toString()}`)
+      .then((v) => setGercekEkipmanTipleri(v.veri))
+      .catch(() => setGercekEkipmanTipleri([]));
+  }, [formuAcik, taslak.santral_id, taslak.isletme_id]);
+
   const gosterilecekSantraller = (tumSantraller || []).filter(
     (s) => s.isletme_id === (platformAdminMi ? seciliHoldingId : kendiIsletmeId)
   );
@@ -152,7 +177,9 @@ export default function SablonlarSayfasi() {
       const s = await istekAt(`/api/v1/bakim-sablonlari/${sablonOzet.sablon_id}`);
       setTaslak({
         ad: s.ad,
+        ekipman_adi: s.ekipman_adi || "",
         ekipman_tipi: s.ekipman_tipi,
+        unite_no: s.unite_no || "",
         periyot_tipi: s.periyot_tipi,
         isletme_id: s.isletme_id,
         santral_id: s.santral_id || "",
@@ -192,13 +219,15 @@ export default function SablonlarSayfasi() {
         );
       } else {
         setBilgi(
-          `Dosyadan ${sonuc.kalemler.length} kontrol maddesi bulundu. Kaydetmeden önce aşağıdan gözden geçirip düzeltebilirsiniz.`
+          `Dosyadan ${sonuc.kalemler.length} kontrol maddesi bulundu. "Ekipman Tipi" alanını sistemde kayıtlı gerçek bir değerle doldurmayı unutmayın — otomatik tahmin edilemez. Kaydetmeden önce diğer alanları da gözden geçirin.`
         );
       }
       setTaslak((t) => ({
         ...t,
         ad: sonuc.ad || "",
-        ekipman_tipi: sonuc.ekipman_tipi || "",
+        ekipman_adi: sonuc.ekipman_adi || "",
+        ekipman_tipi: "",
+        unite_no: sonuc.unite_no || "",
         periyot_tipi: sonuc.periyot_tipi || "AYLIK",
         kalemler: sonuc.kalemler.map((k) => ({ ...k, birim: "", zorunlu: true })),
       }));
@@ -232,7 +261,9 @@ export default function SablonlarSayfasi() {
           method: "PATCH",
           body: JSON.stringify({
             ad: taslak.ad,
+            ekipman_adi: taslak.ekipman_adi || null,
             ekipman_tipi: taslak.ekipman_tipi,
+            unite_no: taslak.unite_no || null,
             periyot_tipi: taslak.periyot_tipi,
             checklist_json: { kalemler: taslak.kalemler },
             santral_id: taslak.santral_id || null,
@@ -244,7 +275,9 @@ export default function SablonlarSayfasi() {
           method: "POST",
           body: JSON.stringify({
             ad: taslak.ad,
+            ekipman_adi: taslak.ekipman_adi || null,
             ekipman_tipi: taslak.ekipman_tipi,
+            unite_no: taslak.unite_no || null,
             periyot_tipi: taslak.periyot_tipi,
             checklist_json: { kalemler: taslak.kalemler },
             isletme_id: taslak.isletme_id,
@@ -393,21 +426,56 @@ export default function SablonlarSayfasi() {
                 </select>
               </div>
               <div className="alan">
+                <label>Ünite No (isteğe bağlı — belirli bir üniteye özelse)</label>
+                <input
+                  value={taslak.unite_no}
+                  onChange={(e) => setTaslak({ ...taslak, unite_no: e.target.value })}
+                  placeholder="Ör. 1, 2, 3…"
+                />
+              </div>
+              <div className="alan">
+                <label>Ekipman Adı</label>
+                <input
+                  required
+                  list="ekipman-adi-onerileri"
+                  value={taslak.ekipman_adi}
+                  onChange={(e) => setTaslak({ ...taslak, ekipman_adi: e.target.value })}
+                  placeholder="Ör. Türbin, Jeneratör, Pompa…"
+                />
+                <datalist id="ekipman-adi-onerileri">
+                  {EKIPMAN_ADI_ONERILERI.map((ad) => (
+                    <option key={ad} value={ad} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="alan">
+                <label>Ekipman Tipi — sistemde kayıtlı ekipmanlarla eşleşmesi için gerçek değerlerden seçin</label>
+                <input
+                  required
+                  list="ekipman-tipi-onerileri"
+                  value={taslak.ekipman_tipi}
+                  onChange={(e) => setTaslak({ ...taslak, ekipman_tipi: e.target.value })}
+                  placeholder="Ör. Francis Türbin, Senkron Jeneratör…"
+                />
+                <datalist id="ekipman-tipi-onerileri">
+                  {(gercekEkipmanTipleri || []).map((tip) => (
+                    <option key={tip} value={tip} />
+                  ))}
+                </datalist>
+                {gercekEkipmanTipleri && gercekEkipmanTipleri.length === 0 && (
+                  <div className="kutuphaneBosUyari">
+                    Bu kapsamda henüz kayıtlı ekipman yok — buraya yazdığınız değerin, ekipmanı oluştururken
+                    gireceğiniz "Tip" alanıyla BİREBİR aynı olduğundan emin olun (büyük/küçük harf dahil).
+                  </div>
+                )}
+              </div>
+              <div className="alan">
                 <label>Şablon adı</label>
                 <input
                   required
                   value={taslak.ad}
                   onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
-                  placeholder="Ör. Türbin Aylık Periyodik Bakım"
-                />
-              </div>
-              <div className="alan">
-                <label>Ekipman tipi</label>
-                <input
-                  required
-                  value={taslak.ekipman_tipi}
-                  onChange={(e) => setTaslak({ ...taslak, ekipman_tipi: e.target.value })}
-                  placeholder="Ör. Türbin"
+                  placeholder="Ör. Ünite 1 Türbin Aylık Periyodik Bakım (ALP2-BKM-TUR-1AY-014)"
                 />
               </div>
               <div className="alan">
@@ -527,7 +595,9 @@ export default function SablonlarSayfasi() {
                                   )}
                                 </div>
                                 <div className="gorevAlt">
-                                  {s.ekipman_tipi} · v{s.versiyon}
+                                  {s.ekipman_adi ? `${s.ekipman_adi} — ` : ""}
+                                  {s.ekipman_tipi}
+                                  {s.unite_no ? ` · Ünite ${s.unite_no}` : ""} · v{s.versiyon}
                                 </div>
                                 <div className="kullaniciAlt">
                                   <button className="linkButon" onClick={() => duzenlemeyiBaslat(s)}>
@@ -602,7 +672,10 @@ export default function SablonlarSayfasi() {
                           <span className="gorevAlt"> — {s.isletme_adi}</span>
                         </div>
                         <div className="gorevAlt">
-                          {s.ekipman_tipi} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
+                          {s.ekipman_adi ? `${s.ekipman_adi} — ` : ""}
+                          {s.ekipman_tipi}
+                          {s.unite_no ? ` · Ünite ${s.unite_no}` : ""} ·{" "}
+                          {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
                         </div>
                         <div className="kullaniciAlt">
                           {kopyaAcikSablonId === s.sablon_id ? (

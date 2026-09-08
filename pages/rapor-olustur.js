@@ -94,11 +94,24 @@ export default function RaporOlusturSayfasi() {
     Promise.all(istekler)
       .then(([veri, h]) => {
         setSantraller(veri.santraller);
-        setPersonel(veri.personel);
         if (h) setHoldingler(h.veri);
       })
       .catch((err) => setHata(err.message));
   }, [router]);
+
+  // Belirli bir santral seçildiğinde, Bakım Sorumlusu kutusunu yalnızca o
+  // santrale erişimi olan kişilerle yeniden dolduruyoruz — aksi halde
+  // holdingdeki TÜM santrallerin personeli karışırdı. Santral seçimi
+  // kaldırılırsa (Tüm Santraller) geniş listeye geri döneriz.
+  useEffect(() => {
+    const p = santralId ? `?santral_id=${santralId}` : "";
+    istekAt(`/api/v1/raporlar/filtre-secenekleri${p}`)
+      .then((veri) => {
+        setPersonel(veri.personel);
+        setSorumluId("");
+      })
+      .catch((err) => setHata(err.message));
+  }, [santralId]);
 
   const gosterilecekSantraller = platformAdmin
     ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
