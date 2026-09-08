@@ -294,8 +294,11 @@ export default function EkipmanListesiSayfasi() {
               ) : (
                 <div className="satirKart" key={e.ekipman_id}>
                   <div>
-                    <strong>{e.ad}</strong> — {e.tip}
-                    {e.unite_no && ` (${e.unite_no})`}
+                    <strong>
+                      {e.unite_no ? `Ünite ${e.unite_no} ` : ""}
+                      {e.ad}
+                    </strong>{" "}
+                    - ({e.tip})
                     {e.durum === "HURDA" && (
                       <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
                         Pasif
