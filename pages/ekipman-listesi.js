@@ -246,15 +246,15 @@ export default function EkipmanListesiSayfasi() {
               duzenlenenId === e.ekipman_id ? (
                 <div className="yonetimFormu" key={e.ekipman_id}>
                   <div className="alan">
-                    <label>Ekipman adı</label>
-                    <input value={taslak.ad} onChange={(ev) => setTaslak({ ...taslak, ad: ev.target.value })} />
-                  </div>
-                  <div className="alan">
                     <label>Ünite No</label>
                     <input
                       value={taslak.unite_no || ""}
                       onChange={(ev) => setTaslak({ ...taslak, unite_no: ev.target.value })}
                     />
+                  </div>
+                  <div className="alan">
+                    <label>Ekipman adı</label>
+                    <input value={taslak.ad} onChange={(ev) => setTaslak({ ...taslak, ad: ev.target.value })} />
                   </div>
                   <div className="alan">
                     <label>Tip</label>
@@ -295,7 +295,7 @@ export default function EkipmanListesiSayfasi() {
                 <div className="satirKart" key={e.ekipman_id}>
                   <div>
                     <strong>
-                      {e.unite_no ? `Ünite ${e.unite_no} ` : ""}
+                      {e.unite_no ? `${e.unite_no} ` : ""}
                       {e.ad}
                     </strong>{" "}
                     - ({e.tip})
