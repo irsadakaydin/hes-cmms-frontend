@@ -639,6 +639,12 @@ export default function SablonlarSayfasi() {
                 </select>
               </div>
 
+              {!taslak.santral_id && (
+                <div className="kutuphaneBosUyari" style={{ marginBottom: "10px" }}>
+                  ⚠ Bu şablonu klasör ağacındaki bir Üniteye bağlamak için önce yukarıdan bir <strong>Santral</strong> seçin — Santral seçilmeden Ekipman/Periyot kutuları görünmez.
+                </div>
+              )}
+
               {taslak.santral_id ? (
                 <>
                   <div className="alan">
