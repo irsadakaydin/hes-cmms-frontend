@@ -623,7 +623,8 @@ export default function SantralDetaySayfasi() {
                   {ekipmanlar &&
                     ekipmanlar.map((e) => (
                       <option key={e.ekipman_id} value={e.ekipman_id}>
-                        {e.ad} ({e.tip})
+                        {e.unite_no ? `${e.unite_no} ` : ""}
+                        {e.ad} - ({e.tip})
                       </option>
                     ))}
                 </select>
