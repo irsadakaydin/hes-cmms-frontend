@@ -210,6 +210,19 @@ export default function SablonlarSayfasi() {
       }
       const sonVeri = await istekAt(`/api/v1/santraller/${santralId}/klasorler?ust_klasor_id=${ustId}`);
       setGoruntuleUniteleri(sonVeri.veri);
+      // Her ünitenin şablon sayısını (kapalıyken de görünsün diye) hemen,
+      // toplu olarak çekiyoruz.
+      const girdiler = await Promise.all(
+        sonVeri.veri.map(async (k) => {
+          try {
+            const s = await istekAt(`/api/v1/klasorler/${k.klasor_id}/sablonlar-alt-agacta`);
+            return [k.klasor_id, s.veri];
+          } catch {
+            return [k.klasor_id, []];
+          }
+        })
+      );
+      setUniteSablonlari(Object.fromEntries(girdiler));
     } catch (err) {
       setGoruntuleHata(err.message);
     }
@@ -233,17 +246,8 @@ export default function SablonlarSayfasi() {
       .catch((err) => setGoruntuleHata(err.message));
   }, []);
 
-  async function uniteAcKapa(k) {
-    const acikMi = !!acikUniteler[k.klasor_id];
-    setAcikUniteler((o) => ({ ...o, [k.klasor_id]: !acikMi }));
-    if (!acikMi && !uniteSablonlari[k.klasor_id]) {
-      try {
-        const veri = await istekAt(`/api/v1/klasorler/${k.klasor_id}/sablonlar-alt-agacta`);
-        setUniteSablonlari((o) => ({ ...o, [k.klasor_id]: veri.veri }));
-      } catch (err) {
-        setGoruntuleHata(err.message);
-      }
-    }
+  function uniteAcKapa(k) {
+    setAcikUniteler((o) => ({ ...o, [k.klasor_id]: !o[k.klasor_id] }));
   }
 
   function grupAnahtari(santralId, periyot) {
@@ -482,14 +486,6 @@ export default function SablonlarSayfasi() {
           {bilgi && <div className="basariliKutu">{bilgi}</div>}
 
           <div className="yonetimFormu" style={{ background: "var(--surface)" }}>
-            <h3 style={{ marginTop: 0 }}>
-              Şablonları Klasöre Göre Görüntüle
-              <span className="gorevAlt" style={{ fontWeight: 400 }}>
-                {" "}
-                — {SABIT_YOL.join(" > ")} &gt; Ünite
-              </span>
-            </h3>
-
             {goruntuleSantraller && goruntuleSantraller.length > 1 && (
               <div className="alan" style={{ maxWidth: "340px" }}>
                 <label>Santral</label>
@@ -509,57 +505,48 @@ export default function SablonlarSayfasi() {
               <div className="bosDurum">Görmek için bir santral seçin.</div>
             )}
 
-            {goruntuleSantralId && !goruntuleUniteleri && <div className="yukleniyor">Yükleniyor…</div>}
-
-            {goruntuleUniteleri && goruntuleUniteleri.length > 0 && (
-              <div className="klasorKartIzgara">
-                {goruntuleUniteleri.map((k) => (
-                  <div key={k.klasor_id} className="klasorKart">
-                    <button type="button" className="klasorKartGovde" onClick={() => uniteAcKapa(k)}>
-                      <svg className="klasorKartIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                          d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11.5 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      <span className="klasorKartAd">{k.ad}</span>
-                      <span className="klasorKartEtiket">
-                        {acikUniteler[k.klasor_id] ? "▾ listeyi kapat" : "▸ listeyi aç"}
-                      </span>
-                    </button>
-                  </div>
-                ))}
-              </div>
+            {goruntuleSantralId && (
+              <h3 style={{ marginTop: 0, marginBottom: "10px" }}>
+                {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
+              </h3>
             )}
+
+            {goruntuleSantralId && !goruntuleUniteleri && <div className="yukleniyor">Yükleniyor…</div>}
 
             {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && (
               <div className="bosDurum">Bu yolda ünite klasörü bulunamadı.</div>
             )}
 
-            {/* Açık ünitelerin şablon listeleri, kart ızgarasının altında tek tek gösterilir */}
             {goruntuleUniteleri &&
-              goruntuleUniteleri
-                .filter((k) => acikUniteler[k.klasor_id])
-                .map((k) => (
-                  <div key={k.klasor_id} style={{ marginTop: "10px" }}>
-                    <div className="gorevAlt" style={{ fontWeight: 700, marginBottom: "6px" }}>
-                      {k.ad} — Bakım Şablonları
-                    </div>
-                    {!uniteSablonlari[k.klasor_id] && <div className="yukleniyor">Yükleniyor…</div>}
-                    {uniteSablonlari[k.klasor_id] && uniteSablonlari[k.klasor_id].length === 0 && (
-                      <div className="bosDurum">Bu ünite için henüz bir bakım şablonu yüklenmemiş.</div>
+              goruntuleUniteleri.map((k) => {
+                const acik = !!acikUniteler[k.klasor_id];
+                const sablonlar = uniteSablonlari[k.klasor_id] || [];
+                return (
+                  <div key={k.klasor_id} style={{ marginBottom: "6px" }}>
+                    <button
+                      type="button"
+                      className="periyotGrupBasligi"
+                      onClick={() => uniteAcKapa(k)}
+                    >
+                      {acik ? "▾" : "▸"} {k.ad} Bakımları ({sablonlar.length})
+                    </button>
+
+                    {acik && (
+                      <div style={{ marginTop: "6px", marginLeft: "6px" }}>
+                        {sablonlar.length === 0 && (
+                          <div className="bosDurum">Bu ünite için henüz bir bakım şablonu yüklenmemiş.</div>
+                        )}
+                        {sablonlar.map((s) => (
+                          <div className="satirKart" key={s.sablon_id}>
+                            <strong>{s.ad}</strong>
+                            <div className="gorevAlt">{PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}</div>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                    {uniteSablonlari[k.klasor_id] &&
-                      uniteSablonlari[k.klasor_id].map((s) => (
-                        <div className="satirKart" key={s.sablon_id}>
-                          <strong>{s.ad}</strong>
-                          <div className="gorevAlt">{PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}</div>
-                        </div>
-                      ))}
                   </div>
-                ))}
+                );
+              })}
           </div>
 
           {platformAdminMi && (
