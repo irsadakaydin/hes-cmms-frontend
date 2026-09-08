@@ -66,6 +66,13 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
   }
 
   function kartaTiklaninca(k) {
+    // Ekipman modunda, bu düğümün altı doğrudan periyot yapraklarıysa
+    // (Haftalık/Aylık/vb.) oraya inmenin bir anlamı yok — burada dur ve
+    // düğümün kendisini seç.
+    if (mod === "ekipman" && k.alt_periyot_mu) {
+      if (secilebilirMi(k)) onSecim(k);
+      return;
+    }
     if (Number(k.alt_sayisi) > 0) {
       icineGir(k);
     } else if (secilebilirMi(k)) {
@@ -151,7 +158,13 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
                 type="button"
                 className={`klasorKartGovde ${seciliKlasorId === k.klasor_id ? "klasorKartGovdeSecili" : ""}`}
                 onClick={() => kartaTiklaninca(k)}
-                title={Number(k.alt_sayisi) > 0 ? "İçine girmek için tıklayın" : k.ad}
+                title={
+                  mod === "ekipman" && k.alt_periyot_mu
+                    ? "Bu ekipmanı seçmek için tıklayın"
+                    : Number(k.alt_sayisi) > 0
+                    ? "İçine girmek için tıklayın"
+                    : k.ad
+                }
               >
                 <svg className="klasorKartIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
