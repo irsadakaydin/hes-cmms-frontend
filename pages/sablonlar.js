@@ -167,10 +167,15 @@ export default function SablonlarSayfasi() {
   // getiriyoruz — artık şablon, ağaçta yeniden gezinmek yerine doğrudan
   // önceden oluşturulmuş bir ekipmandan seçilir (ekipmanı olmayan bir
   // konuma şablon yüklenemez).
+  // NOT: Bir şablonu DÜZENLERKEN (duzenlenenSablonId doluyken) bu efekt,
+  // duzenlemeyiBaslat'ın az önce doldurduğu Ekipman/Periyot seçimini
+  // SIFIRLAMAMALI — bu yüzden düzenleme modundayken sıfırlama atlanır.
   useEffect(() => {
-    setSablonEkipmanId("");
-    setSablonPeriyotYapraklari(null);
-    setKlasorYolu("");
+    if (!duzenlenenSablonId) {
+      setSablonEkipmanId("");
+      setSablonPeriyotYapraklari(null);
+      setKlasorYolu("");
+    }
     if (!formuAcik || !taslak.santral_id) {
       setSantralEkipmanlari(null);
       return;
@@ -178,7 +183,7 @@ export default function SablonlarSayfasi() {
     istekAt(`/api/v1/santraller/${taslak.santral_id}/ekipmanlar`)
       .then((v) => setSantralEkipmanlari(v.veri))
       .catch((err) => setHata(err.message));
-  }, [formuAcik, taslak.santral_id]);
+  }, [formuAcik, taslak.santral_id, duzenlenenSablonId]);
 
   const gosterilecekSantraller = (tumSantraller || []).filter(
     (s) => s.isletme_id === (platformAdminMi ? seciliHoldingId : kendiIsletmeId)
@@ -285,10 +290,28 @@ export default function SablonlarSayfasi() {
       });
       if (s.klasor_id) {
         istekAt(`/api/v1/klasorler/${s.klasor_id}/yol`)
-          .then((yol) => setKlasorYolu(yol.veri.map((y) => y.ad).join(" > ")))
+          .then(async (yol) => {
+            setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+            // Bu şablonun BAĞLI OLDUĞU ekipmanı (yaprağın bir üstü) bulup
+            // Ekipman/Periyot kutularında önceden seçili gösteriyoruz —
+            // böylece "şu an yanlış üniteye mi bağlı" hemen görülebilir.
+            const ustDugum = yol.veri[yol.veri.length - 2];
+            if (ustDugum) {
+              try {
+                const ekipmanlarVeri = await istekAt(`/api/v1/klasorler/${ustDugum.klasor_id}/ekipmanlar`);
+                if (ekipmanlarVeri.veri[0]) setSablonEkipmanId(ekipmanlarVeri.veri[0].ekipman_id);
+                const periyotVeri = await istekAt(`/api/v1/klasorler/${ustDugum.klasor_id}/periyot-yapraklari`);
+                setSablonPeriyotYapraklari(periyotVeri.veri);
+              } catch {
+                // sessizce geç — kutular boş kalır, elle seçilebilir
+              }
+            }
+          })
           .catch(() => setKlasorYolu(""));
       } else {
         setKlasorYolu("");
+        setSablonEkipmanId("");
+        setSablonPeriyotYapraklari(null);
       }
       setDuzenlenenSablonId(s.sablon_id);
       setFormuAcik(true);
