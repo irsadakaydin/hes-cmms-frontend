@@ -34,6 +34,7 @@ export default function SantralDetaySayfasi() {
   const [ekipmanlar, setEkipmanlar] = useState(null);
   const [planlar, setPlanlar] = useState(null);
   const [tumSablonlar, setTumSablonlar] = useState(null);
+  const [ekipmanSablonlari, setEkipmanSablonlari] = useState(null);
   const [hata, setHata] = useState(null);
 
   const [ekipmanFormuAcik, setEkipmanFormuAcik] = useState(false);
@@ -307,14 +308,6 @@ export default function SantralDetaySayfasi() {
       </div>
     );
   }
-
-  // Seçilen ekipmanın tipine göre şablon listesini anlık süzer — periyot,
-  // seçilen şablona göre otomatik belirlenir.
-  const yeniPlanSeciliEkipman = (ekipmanlar || []).find((ek) => ek.ekipman_id === yeniPlan.ekipman_id);
-  const sabitliSablonlar = (tumSablonlar || []).filter((sb) => {
-    if (yeniPlanSeciliEkipman && sb.ekipman_tipi !== yeniPlanSeciliEkipman.tip) return false;
-    return true;
-  });
 
   return (
     <>
@@ -605,7 +598,23 @@ export default function SantralDetaySayfasi() {
                 <select
                   required
                   value={yeniPlan.ekipman_id}
-                  onChange={(e) => setYeniPlan({ ...yeniPlan, ekipman_id: e.target.value, sablon_id: "" })}
+                  onChange={async (e) => {
+                    const ekipmanId = e.target.value;
+                    setYeniPlan({ ...yeniPlan, ekipman_id: ekipmanId, sablon_id: "" });
+                    setEkipmanSablonlari(null);
+                    if (!ekipmanId) return;
+                    const ek = (ekipmanlar || []).find((x) => x.ekipman_id === ekipmanId);
+                    if (ek && ek.klasor_id) {
+                      try {
+                        const veri = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/sablonlar-alt-agacta`);
+                        setEkipmanSablonlari(veri.veri);
+                      } catch (err) {
+                        setHata(err.message);
+                      }
+                    } else {
+                      setEkipmanSablonlari((tumSablonlar || []).filter((sb) => ek && sb.ekipman_tipi === ek.tip));
+                    }
+                  }}
                 >
                   <option value="">Seçin…</option>
                   {ekipmanlar &&
@@ -618,14 +627,14 @@ export default function SantralDetaySayfasi() {
               </div>
               <div className="alan">
                 <label>
-                  Bakım şablonu — seçilen ekipman tipine göre süzülür{" "}
+                  Bakım şablonu — bu ekipmana ait şablon(lar){" "}
                   <span className="kutuphaneEtiketi">— {santral.isletme_adi} Kütüphanesi</span>
                 </label>
                 <select
                   required
                   value={yeniPlan.sablon_id}
                   onChange={(e) => {
-                    const s = tumSablonlar.find((x) => x.sablon_id === e.target.value);
+                    const s = (ekipmanSablonlari || []).find((x) => x.sablon_id === e.target.value);
                     setYeniPlan({
                       ...yeniPlan,
                       sablon_id: e.target.value,
@@ -634,16 +643,16 @@ export default function SantralDetaySayfasi() {
                   }}
                 >
                   <option value="">Seçin…</option>
-                  {sabitliSablonlar.map((s) => (
+                  {(ekipmanSablonlari || []).map((s) => (
                     <option key={s.sablon_id} value={s.sablon_id}>
                       {s.ad} ({PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi})
                     </option>
                   ))}
                 </select>
-                {yeniPlan.ekipman_id && sabitliSablonlar.length === 0 && (
+                {yeniPlan.ekipman_id && ekipmanSablonlari && ekipmanSablonlari.length === 0 && (
                   <div className="kutuphaneBosUyari">
-                    Bu ekipman tipi için {santral.isletme_adi} kütüphanesinde henüz bir şablon yok —{" "}
-                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından ekleyin.
+                    Bu ekipman için henüz bir bakım şablonu yok —{" "}
+                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından bu ekipmanı seçerek ekleyin.
                   </div>
                 )}
               </div>
