@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, kullaniciAl, dosyaIndir } from "../lib/api";
+import KlasorGezgini from "../components/KlasorGezgini";
 import { excelDenSablonCikar } from "../lib/excelSablonImport";
 import UstBar from "../components/UstBar";
 
@@ -34,6 +35,7 @@ function bosSablon(varsayilanIsletmeId, varsayilanSantralId) {
     ekipman_adi: "",
     ekipman_tipi: "",
     unite_no: "",
+    klasor_id: "",
     periyot_tipi: "AYLIK",
     kalemler: [],
     isletme_id: varsayilanIsletmeId,
@@ -97,6 +99,7 @@ export default function SablonlarSayfasi() {
   const [taslak, setTaslak] = useState(bosSablon(kendiIsletmeId));
   const [duzenlenenSablonId, setDuzenlenenSablonId] = useState(null);
   const [acikKarekodId, setAcikKarekodId] = useState(null);
+  const [klasorYolu, setKlasorYolu] = useState("");
   const [gercekEkipmanTipleri, setGercekEkipmanTipleri] = useState(null);
 
   const verileriYukle = useCallback(async () => {
@@ -165,6 +168,7 @@ export default function SablonlarSayfasi() {
   function yeniSablonBaslat() {
     setTaslak(bosSablon(platformAdminMi ? seciliHoldingId : kendiIsletmeId));
     setDuzenlenenSablonId(null);
+    setKlasorYolu("");
     setFormuAcik(true);
     setBilgi(null);
     setHata(null);
@@ -180,11 +184,19 @@ export default function SablonlarSayfasi() {
         ekipman_adi: s.ekipman_adi || "",
         ekipman_tipi: s.ekipman_tipi,
         unite_no: s.unite_no || "",
+        klasor_id: s.klasor_id || "",
         periyot_tipi: s.periyot_tipi,
         isletme_id: s.isletme_id,
         santral_id: s.santral_id || "",
         kalemler: (s.checklist_json?.kalemler || []).map((k) => ({ ...k })),
       });
+      if (s.klasor_id) {
+        istekAt(`/api/v1/klasorler/${s.klasor_id}/yol`)
+          .then((yol) => setKlasorYolu(yol.veri.map((y) => y.ad).join(" > ")))
+          .catch(() => setKlasorYolu(""));
+      } else {
+        setKlasorYolu("");
+      }
       setDuzenlenenSablonId(s.sablon_id);
       setFormuAcik(true);
     } catch (err) {
@@ -264,6 +276,7 @@ export default function SablonlarSayfasi() {
             ekipman_adi: taslak.ekipman_adi || null,
             ekipman_tipi: taslak.ekipman_tipi,
             unite_no: taslak.unite_no || null,
+            klasor_id: taslak.klasor_id || null,
             periyot_tipi: taslak.periyot_tipi,
             checklist_json: { kalemler: taslak.kalemler },
             santral_id: taslak.santral_id || null,
@@ -278,6 +291,7 @@ export default function SablonlarSayfasi() {
             ekipman_adi: taslak.ekipman_adi || null,
             ekipman_tipi: taslak.ekipman_tipi,
             unite_no: taslak.unite_no || null,
+            klasor_id: taslak.klasor_id || null,
             periyot_tipi: taslak.periyot_tipi,
             checklist_json: { kalemler: taslak.kalemler },
             isletme_id: taslak.isletme_id,
@@ -413,7 +427,9 @@ export default function SablonlarSayfasi() {
                 <label>Santral (isteğe bağlı — boş bırakılırsa holding genelinde geçerli olur)</label>
                 <select
                   value={taslak.santral_id}
-                  onChange={(e) => setTaslak({ ...taslak, santral_id: e.target.value })}
+                  onChange={(e) =>
+                    setTaslak({ ...taslak, santral_id: e.target.value, klasor_id: "" })
+                  }
                 >
                   <option value="">Genel (Tüm Santraller)</option>
                   {(tumSantraller || [])
@@ -425,50 +441,96 @@ export default function SablonlarSayfasi() {
                     ))}
                 </select>
               </div>
-              <div className="alan">
-                <label>Ünite No (isteğe bağlı — belirli bir üniteye özelse)</label>
-                <input
-                  value={taslak.unite_no}
-                  onChange={(e) => setTaslak({ ...taslak, unite_no: e.target.value })}
-                  placeholder="Ör. 1, 2, 3…"
-                />
-              </div>
-              <div className="alan">
-                <label>Ekipman Adı</label>
-                <input
-                  required
-                  list="ekipman-adi-onerileri"
-                  value={taslak.ekipman_adi}
-                  onChange={(e) => setTaslak({ ...taslak, ekipman_adi: e.target.value })}
-                  placeholder="Ör. Türbin, Jeneratör, Pompa…"
-                />
-                <datalist id="ekipman-adi-onerileri">
-                  {EKIPMAN_ADI_ONERILERI.map((ad) => (
-                    <option key={ad} value={ad} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="alan">
-                <label>Ekipman Tipi — sistemde kayıtlı ekipmanlarla eşleşmesi için gerçek değerlerden seçin</label>
-                <input
-                  required
-                  list="ekipman-tipi-onerileri"
-                  value={taslak.ekipman_tipi}
-                  onChange={(e) => setTaslak({ ...taslak, ekipman_tipi: e.target.value })}
-                  placeholder="Ör. Francis Türbin, Senkron Jeneratör…"
-                />
-                <datalist id="ekipman-tipi-onerileri">
-                  {(gercekEkipmanTipleri || []).map((tip) => (
-                    <option key={tip} value={tip} />
-                  ))}
-                </datalist>
-                {gercekEkipmanTipleri && gercekEkipmanTipleri.length === 0 && (
-                  <div className="kutuphaneBosUyari">
-                    Bu kapsamda henüz kayıtlı ekipman yok — buraya yazdığınız değerin, ekipmanı oluştururken
-                    gireceğiniz "Tip" alanıyla BİREBİR aynı olduğundan emin olun (büyük/küçük harf dahil).
+
+              {taslak.santral_id ? (
+                <div className="alan">
+                  <label>
+                    Klasör konumu — bu şablonu bağlayacağınız periyot yaprağını seçin.
+                    {klasorYolu && <strong> Seçili: {klasorYolu}</strong>}
+                  </label>
+                  <KlasorGezgini
+                    santralId={taslak.santral_id}
+                    mod="sablon"
+                    seciliKlasorId={taslak.klasor_id}
+                    onSecim={async (k) => {
+                      setTaslak((t) => ({ ...t, klasor_id: k.klasor_id, periyot_tipi: k.periyot_tipi }));
+                      try {
+                        const yol = await istekAt(`/api/v1/klasorler/${k.klasor_id}/yol`);
+                        setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+                      } catch {
+                        setKlasorYolu(k.ad);
+                      }
+                    }}
+                  />
+                  {taslak.klasor_id && (
+                    <div className="gorevAlt" style={{ marginTop: "6px" }}>
+                      Periyot bu klasörden otomatik geldi:{" "}
+                      {PERIYOT_ETIKETLERI[taslak.periyot_tipi] || taslak.periyot_tipi}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="alan">
+                    <label>Ünite No (isteğe bağlı — belirli bir üniteye özelse)</label>
+                    <input
+                      value={taslak.unite_no}
+                      onChange={(e) => setTaslak({ ...taslak, unite_no: e.target.value })}
+                      placeholder="Ör. 1, 2, 3…"
+                    />
                   </div>
-                )}
-              </div>
+                  <div className="alan">
+                    <label>Ekipman Adı</label>
+                    <input
+                      required
+                      list="ekipman-adi-onerileri"
+                      value={taslak.ekipman_adi}
+                      onChange={(e) => setTaslak({ ...taslak, ekipman_adi: e.target.value })}
+                      placeholder="Ör. Türbin, Jeneratör, Pompa…"
+                    />
+                    <datalist id="ekipman-adi-onerileri">
+                      {EKIPMAN_ADI_ONERILERI.map((ad) => (
+                        <option key={ad} value={ad} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="alan">
+                    <label>Ekipman Tipi — sistemde kayıtlı ekipmanlarla eşleşmesi için gerçek değerlerden seçin</label>
+                    <input
+                      required
+                      list="ekipman-tipi-onerileri"
+                      value={taslak.ekipman_tipi}
+                      onChange={(e) => setTaslak({ ...taslak, ekipman_tipi: e.target.value })}
+                      placeholder="Ör. Francis Türbin, Senkron Jeneratör…"
+                    />
+                    <datalist id="ekipman-tipi-onerileri">
+                      {(gercekEkipmanTipleri || []).map((tip) => (
+                        <option key={tip} value={tip} />
+                      ))}
+                    </datalist>
+                    {gercekEkipmanTipleri && gercekEkipmanTipleri.length === 0 && (
+                      <div className="kutuphaneBosUyari">
+                        Bu kapsamda henüz kayıtlı ekipman yok — buraya yazdığınız değerin, ekipmanı oluştururken
+                        gireceğiniz "Tip" alanıyla BİREBİR aynı olduğundan emin olun (büyük/küçük harf dahil).
+                      </div>
+                    )}
+                  </div>
+                  <div className="alan">
+                    <label>Periyot</label>
+                    <select
+                      value={taslak.periyot_tipi}
+                      onChange={(e) => setTaslak({ ...taslak, periyot_tipi: e.target.value })}
+                    >
+                      {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
+                        <option key={deger} value={deger}>
+                          {etiket}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
               <div className="alan">
                 <label>Şablon adı</label>
                 <input
@@ -477,19 +539,6 @@ export default function SablonlarSayfasi() {
                   onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
                   placeholder="Ör. Ünite 1 Türbin Aylık Periyodik Bakım (ALP2-BKM-TUR-1AY-014)"
                 />
-              </div>
-              <div className="alan">
-                <label>Periyot</label>
-                <select
-                  value={taslak.periyot_tipi}
-                  onChange={(e) => setTaslak({ ...taslak, periyot_tipi: e.target.value })}
-                >
-                  {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => (
-                    <option key={deger} value={deger}>
-                      {etiket}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="kalemSoru" style={{ marginTop: "18px", marginBottom: "10px" }}>

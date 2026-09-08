@@ -3,9 +3,10 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
+import KlasorGezgini from "../components/KlasorGezgini";
 
 function bosForm() {
-  return { santral_id: "", ad: "", tip: "", unite_no: "", seri_no: "", uretici: "", kurulum_tarihi: "", konum_notu: "" };
+  return { santral_id: "", ad: "", tip: "", unite_no: "", seri_no: "", uretici: "", kurulum_tarihi: "", konum_notu: "", klasor_id: "" };
 }
 
 export default function EkipmanOlusturSayfasi() {
@@ -19,6 +20,7 @@ export default function EkipmanOlusturSayfasi() {
   const [bilgi, setBilgi] = useState(null);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosForm());
+  const [klasorYolu, setKlasorYolu] = useState("");
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -52,6 +54,7 @@ export default function EkipmanOlusturSayfasi() {
       });
       setBilgi(`"${yeni.ad}" ekipmanı oluşturuldu.`);
       setTaslak({ ...bosForm(), santral_id });
+      setKlasorYolu("");
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -110,7 +113,7 @@ export default function EkipmanOlusturSayfasi() {
                     <select
                       required
                       value={taslak.santral_id}
-                      onChange={(e) => setTaslak({ ...taslak, santral_id: e.target.value })}
+                      onChange={(e) => setTaslak({ ...taslak, santral_id: e.target.value, klasor_id: "" })}
                     >
                       <option value="">Seçin…</option>
                       {gosterilecekSantraller &&
@@ -121,6 +124,30 @@ export default function EkipmanOlusturSayfasi() {
                         ))}
                     </select>
                   </div>
+
+                  {taslak.santral_id && (
+                    <div className="alan">
+                      <label>
+                        Klasör konumu (isteğe bağlı) — bu ekipmanın klasör ağacındaki yerini seçin.
+                        {klasorYolu && <strong> Seçili: {klasorYolu}</strong>}
+                      </label>
+                      <KlasorGezgini
+                        santralId={taslak.santral_id}
+                        mod="ekipman"
+                        seciliKlasorId={taslak.klasor_id}
+                        onSecim={async (k) => {
+                          setTaslak((t) => ({ ...t, klasor_id: k.klasor_id }));
+                          try {
+                            const yol = await istekAt(`/api/v1/klasorler/${k.klasor_id}/yol`);
+                            setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+                          } catch {
+                            setKlasorYolu(k.ad);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <div className="alan">
                     <label>Ünite No (isteğe bağlı)</label>
                     <input

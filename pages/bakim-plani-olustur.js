@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
+import KlasorGezgini from "../components/KlasorGezgini";
 
 const PERIYOT_ETIKETLERI = {
   GUNLUK: "Günlük",
@@ -43,6 +44,13 @@ export default function BakimPlaniOlusturSayfasi() {
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosForm());
 
+  // Yeni akış: klasör ağacından seçim (varsayılan) — ağaç yoksa/istenirse
+  // eski elle seçim yöntemine geçilebilir.
+  const [secimModu, setSecimModu] = useState("klasor"); // "klasor" | "elle"
+  const [klasorYolu, setKlasorYolu] = useState("");
+  const [klasorEkipmanlari, setKlasorEkipmanlari] = useState(null);
+  const [klasorSablonlari, setKlasorSablonlari] = useState(null);
+
   useEffect(() => {
     if (!tokenAl()) {
       router.replace("/");
@@ -68,6 +76,9 @@ export default function BakimPlaniOlusturSayfasi() {
       setEkipmanlar(null);
       setTumSablonlar(null);
       setAtanabilirKullanicilar(null);
+      setKlasorYolu("");
+      setKlasorEkipmanlari(null);
+      setKlasorSablonlari(null);
       if (!santral_id) return;
 
       try {
@@ -87,10 +98,34 @@ export default function BakimPlaniOlusturSayfasi() {
     [santraller]
   );
 
-  // Seçilen ekipmanın tipine göre şablon listesini anlık süzer — ör.
-  // "Türbin 1" (tip: Türbin) seçilince yalnızca o tipteki şablonlar
-  // listelenir (periyot, seçilen şablona göre OTOMATİK belirlenir — ayrıca
-  // önceden bir periyot seçmenize gerek yok).
+  // Klasör ağacından bir PERİYOT YAPRAĞI seçildiğinde: o yaprağın üst
+  // düğümüne (ekipman düğümü) bağlı ekipmanları ve o yaprağa yüklenmiş
+  // şablon(lar)ı getirir — eşleşme artık kimlik (ID) bazlı, hatasız.
+  async function klasorSecildi(k) {
+    setHata(null);
+    try {
+      const yol = await istekAt(`/api/v1/klasorler/${k.klasor_id}/yol`);
+      setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+      const ustDugum = yol.veri[yol.veri.length - 2]; // yaprağın hemen üstü = ekipman düğümü
+      const [ekipmanSonuc, sablonSonuc] = await Promise.all([
+        ustDugum ? istekAt(`/api/v1/klasorler/${ustDugum.klasor_id}/ekipmanlar`) : Promise.resolve({ veri: [] }),
+        istekAt(`/api/v1/bakim-sablonlari?klasor_id=${k.klasor_id}&isletme_id=${taslak.isletme_id || ""}`),
+      ]);
+      setKlasorEkipmanlari(ekipmanSonuc.veri);
+      setKlasorSablonlari(sablonSonuc.veri.filter((s) => s.aktif_mi));
+      setTaslak((t) => ({
+        ...t,
+        periyot: k.periyot_tipi,
+        sablon_id: sablonSonuc.veri.length === 1 ? sablonSonuc.veri[0].sablon_id : "",
+        ekipman_id: ekipmanSonuc.veri.length === 1 ? ekipmanSonuc.veri[0].ekipman_id : "",
+      }));
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
+  // ESKİ AKIŞ (elle seçim) — klasör ağacı henüz kurulmamış santraller için
+  // yedek yöntem. Seçilen ekipmanın tipine göre şablon listesini süzer.
   const seciliEkipman = (ekipmanlar || []).find((ek) => ek.ekipman_id === taslak.ekipman_id);
   const gosterilecekSablonlar = (tumSablonlar || []).filter((sb) => {
     if (seciliEkipman && sb.ekipman_tipi !== seciliEkipman.tip) return false;
@@ -131,6 +166,9 @@ export default function BakimPlaniOlusturSayfasi() {
       });
       setBilgi("Bakım planı oluşturuldu.");
       setTaslak({ ...bosForm(), santral_id });
+      setKlasorYolu("");
+      setKlasorEkipmanlari(null);
+      setKlasorSablonlari(null);
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -199,46 +237,115 @@ export default function BakimPlaniOlusturSayfasi() {
 
               {taslak.santral_id && (
                 <>
-                  <div className="alan">
-                    <label>Ekipman</label>
-                    <select
-                      required
-                      value={taslak.ekipman_id}
-                      onChange={(e) => ekipmanSecildi(e.target.value)}
+                  <div style={{ marginBottom: "10px" }}>
+                    <button
+                      type="button"
+                      className="linkButon"
+                      onClick={() => setSecimModu(secimModu === "klasor" ? "elle" : "klasor")}
                     >
-                      <option value="">Seçin…</option>
-                      {ekipmanlar &&
-                        ekipmanlar.map((ek) => (
-                          <option key={ek.ekipman_id} value={ek.ekipman_id}>
-                            {ek.ad} ({ek.tip})
-                          </option>
-                        ))}
-                    </select>
-                    {ekipmanlar && ekipmanlar.length === 0 && (
-                      <div className="kutuphaneBosUyari">
-                        Bu santralde henüz ekipman yok — önce{" "}
-                        <a href="/ekipman-olustur">Ekipman Oluştur</a>'dan ekleyin.
-                      </div>
-                    )}
+                      {secimModu === "klasor"
+                        ? "Klasör ağacı yerine elle seçmek istiyorum →"
+                        : "← Klasör ağacından seçmek istiyorum"}
+                    </button>
                   </div>
 
-                  <div className="alan">
-                    <label>Bakım şablonu — seçilen ekipman tipine göre süzülür</label>
-                    <select required value={taslak.sablon_id} onChange={(e) => sablonSecildi(e.target.value)}>
-                      <option value="">Seçin…</option>
-                      {gosterilecekSablonlar.map((sb) => (
-                        <option key={sb.sablon_id} value={sb.sablon_id}>
-                          {sb.ad} ({PERIYOT_ETIKETLERI[sb.periyot_tipi] || sb.periyot_tipi})
-                        </option>
-                      ))}
-                    </select>
-                    {taslak.ekipman_id && gosterilecekSablonlar.length === 0 && (
-                      <div className="kutuphaneBosUyari">
-                        Bu ekipman tipi için henüz bir bakım şablonu yok —{" "}
-                        <a href="/sablonlar">Bakım Şablonları</a>'ndan ekleyin.
+                  {secimModu === "klasor" ? (
+                    <>
+                      <div className="alan">
+                        <label>
+                          Klasör konumu — bakımı yapılacak periyot yaprağını seçin.
+                          {klasorYolu && <strong> Seçili: {klasorYolu}</strong>}
+                        </label>
+                        <KlasorGezgini santralId={taslak.santral_id} mod="sablon" onSecim={klasorSecildi} />
                       </div>
-                    )}
-                  </div>
+
+                      {klasorYolu && (
+                        <>
+                          <div className="alan">
+                            <label>Ekipman — bu klasöre bağlı ekipmanlardan seçin</label>
+                            <select
+                              required
+                              value={taslak.ekipman_id}
+                              onChange={(e) => setTaslak({ ...taslak, ekipman_id: e.target.value })}
+                            >
+                              <option value="">Seçin…</option>
+                              {(klasorEkipmanlari || []).map((ek) => (
+                                <option key={ek.ekipman_id} value={ek.ekipman_id}>
+                                  {ek.ad} ({ek.tip})
+                                </option>
+                              ))}
+                            </select>
+                            {klasorEkipmanlari && klasorEkipmanlari.length === 0 && (
+                              <div className="kutuphaneBosUyari">
+                                Bu klasör konumuna bağlı ekipman yok — önce{" "}
+                                <a href="/ekipman-olustur">Ekipman Oluştur</a>'dan, bu klasörü seçerek ekleyin.
+                              </div>
+                            )}
+                          </div>
+                          <div className="alan">
+                            <label>Bakım şablonu — bu klasöre yüklenmiş şablon(lar)</label>
+                            <select
+                              required
+                              value={taslak.sablon_id}
+                              onChange={(e) => setTaslak({ ...taslak, sablon_id: e.target.value })}
+                            >
+                              <option value="">Seçin…</option>
+                              {(klasorSablonlari || []).map((sb) => (
+                                <option key={sb.sablon_id} value={sb.sablon_id}>
+                                  {sb.ad}
+                                </option>
+                              ))}
+                            </select>
+                            {klasorSablonlari && klasorSablonlari.length === 0 && (
+                              <div className="kutuphaneBosUyari">
+                                Bu klasöre henüz şablon yüklenmemiş —{" "}
+                                <a href="/sablonlar">Bakım Şablonları</a>'ndan bu klasörü seçerek yükleyin.
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="alan">
+                        <label>Ekipman</label>
+                        <select required value={taslak.ekipman_id} onChange={(e) => ekipmanSecildi(e.target.value)}>
+                          <option value="">Seçin…</option>
+                          {ekipmanlar &&
+                            ekipmanlar.map((ek) => (
+                              <option key={ek.ekipman_id} value={ek.ekipman_id}>
+                                {ek.ad} ({ek.tip})
+                              </option>
+                            ))}
+                        </select>
+                        {ekipmanlar && ekipmanlar.length === 0 && (
+                          <div className="kutuphaneBosUyari">
+                            Bu santralde henüz ekipman yok — önce{" "}
+                            <a href="/ekipman-olustur">Ekipman Oluştur</a>'dan ekleyin.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="alan">
+                        <label>Bakım şablonu — seçilen ekipman tipine göre süzülür</label>
+                        <select required value={taslak.sablon_id} onChange={(e) => sablonSecildi(e.target.value)}>
+                          <option value="">Seçin…</option>
+                          {gosterilecekSablonlar.map((sb) => (
+                            <option key={sb.sablon_id} value={sb.sablon_id}>
+                              {sb.ad} ({PERIYOT_ETIKETLERI[sb.periyot_tipi] || sb.periyot_tipi})
+                            </option>
+                          ))}
+                        </select>
+                        {taslak.ekipman_id && gosterilecekSablonlar.length === 0 && (
+                          <div className="kutuphaneBosUyari">
+                            Bu ekipman tipi için henüz bir bakım şablonu yok —{" "}
+                            <a href="/sablonlar">Bakım Şablonları</a>'ndan ekleyin.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
 
                   <div className="alan">
                     <label>Periyot — seçtiğiniz şablona göre otomatik dolar</label>
