@@ -279,7 +279,8 @@ export default function GirisLoglariSayfasi() {
                   <strong>{k.ad_soyad}</strong> — {k.eposta}
                 </div>
                 <div className="gorevAlt">
-                  {ROL_ETIKETLERI[k.rol] || k.rol} · {k.isletme_adi} · {tarihSaatFormatla(k.giris_tarihi)}
+                  {ROL_ETIKETLERI[k.rol] || k.rol} · {k.isletme_adi} · {tarihSaatFormatla(k.giris_tarihi)} ·{" "}
+                  IP: {k.ip_adresi || "—"}
                 </div>
               </div>
             ))}
