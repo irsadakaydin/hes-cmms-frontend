@@ -134,7 +134,7 @@ h1, h2, h3 {
 .icerik {
   flex: 1;
   width: 100%;
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 24px 20px 60px;
 }
@@ -1289,6 +1289,24 @@ h1, h2, h3 {
   background: var(--teal-deep);
   color: #fff;
   box-shadow: 0 2px 8px rgba(11, 46, 47, 0.25);
+}
+
+.klasorSilButon {
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: var(--red, #a83b2e);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.klasorSilButon:hover {
+  background: #a83b2e;
+  border-color: #a83b2e;
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 /* ---------- Özet Banner — Dönem seçici (sabit ızgara, açılır değil) ---------- */
