@@ -1112,17 +1112,116 @@ h1, h2, h3 {
   flex-shrink: 0;
 }
 
-/* ---------- Klasör Gezgini — "Bunu Seç" / "İçine Gir" ---------- */
+/* ---------- Klasör Gezgini — breadcrumb + kart ızgarası ---------- */
+.klasorBreadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+}
+.klasorBreadcrumbAdim,
+.klasorBreadcrumbAktif {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 4px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.klasorBreadcrumbAdim {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.klasorBreadcrumbAdim:hover {
+  background: var(--paper);
+  color: var(--teal-deep);
+}
+.klasorBreadcrumbAktif {
+  color: var(--teal-deep);
+  font-weight: 700;
+}
+.klasorBreadcrumbAyrac {
+  color: var(--line-strong);
+  margin: 0 2px;
+}
+
+.klasorKartIzgara {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.klasorKart {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 132px;
+}
+
+.klasorKartGovde {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 14px 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, background-color 0.2s ease;
+}
+.klasorKartGovde:hover {
+  border-color: var(--teal-deep);
+  box-shadow: 0 4px 14px rgba(11, 46, 47, 0.14);
+  transform: translateY(-2px);
+}
+.klasorKartGovdeSecili {
+  border-color: var(--teal-deep);
+  background: var(--paper);
+}
+
+.klasorKartIkon {
+  width: 30px;
+  height: 30px;
+  color: var(--amber);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.klasorKartGovde:hover .klasorKartIkon {
+  transform: scale(1.08);
+}
+
+.klasorKartAd {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.25;
+}
+
+.klasorKartEtiket {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
 .klasorSecButon,
 .klasorSecButonAktif {
   border: 1.5px solid var(--teal-deep);
   background: transparent;
   color: var(--teal-deep);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 6px 14px;
+  padding: 5px 10px;
   border-radius: 999px;
   cursor: pointer;
+  text-align: center;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 .klasorSecButon:hover {
@@ -1137,136 +1236,49 @@ h1, h2, h3 {
   box-shadow: 0 2px 8px rgba(11, 46, 47, 0.25);
 }
 
-.klasorIcineGirButon {
-  display: inline-flex;
+/* ---------- Özet Banner — Dönem seçici (sabit ızgara, açılır değil) ---------- */
+.donemIzgara {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(96px, 1fr));
+  gap: 6px;
+  max-width: 320px;
+}
+.donemKarti {
+  display: flex;
   align-items: center;
   gap: 6px;
-  border: 1.5px solid var(--line-strong);
-  background: var(--paper);
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 6px 12px 6px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
-}
-.klasorIcineGirButon:hover {
-  background: var(--amber);
-  border-color: var(--amber);
-  color: #fff;
-  transform: translateY(-1px);
-}
-.klasorIcineGirSayisi {
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 999px;
-  padding: 1px 7px;
-  font-size: 11px;
-  transition: background-color 0.2s ease;
-}
-.klasorIcineGirButon:hover .klasorIcineGirSayisi {
-  background: rgba(255, 255, 255, 0.28);
-}
-.klasorIcineGirOk {
-  font-size: 16px;
-  line-height: 1;
-  transition: transform 0.2s ease;
-}
-.klasorIcineGirButon:hover .klasorIcineGirOk {
-  transform: translateX(3px);
-}
-
-/* ---------- Özet Banner — Dönem seçici (özel açılır menü) ---------- */
-.donemSeciciSarmalayici {
-  position: relative;
-  display: inline-block;
-}
-.donemSeciciButon {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  justify-content: center;
   background: var(--surface);
   border: 1.5px solid var(--line-strong);
   border-radius: 10px;
-  padding: 7px 12px;
-  font-size: 13px;
+  padding: 7px 10px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
-.donemSeciciButon:hover {
+.donemKarti:hover {
   border-color: var(--teal-deep);
   box-shadow: 0 2px 6px rgba(11, 46, 47, 0.12);
+  transform: translateY(-1px);
 }
-.donemSeciciIkon {
-  width: 17px;
-  height: 17px;
-  color: var(--teal-deep);
-  flex-shrink: 0;
-}
-.donemSeciciOk {
-  width: 14px;
-  height: 14px;
-  color: var(--ink-soft);
-  transition: transform 0.25s ease;
-  flex-shrink: 0;
-}
-.donemSeciciOkAcik {
-  transform: rotate(180deg);
-}
-
-.donemSeciciMenu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
-  background: #fff;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  box-shadow: 0 10px 28px rgba(11, 46, 47, 0.16);
-  padding: 6px;
-  min-width: 170px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-
-  opacity: 0;
-  transform: translateY(-6px) scale(0.97);
-  pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.donemSeciciMenuAcik {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-
-.donemSeciciSecenek {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-.donemSeciciSecenek:hover {
-  background: var(--paper);
-}
-.donemSeciciSecenekAktif {
+.donemKartiAktif {
   background: var(--teal-deep);
+  border-color: var(--teal-deep);
   color: #fff;
-  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(11, 46, 47, 0.22);
 }
-.donemSeciciSecenekAktif:hover {
-  background: var(--teal-deep);
+.donemKartiIkon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--teal-deep);
+  transition: color 0.2s ease;
 }
-.donemSeciciTik {
-  font-size: 12px;
+.donemKartiAktif .donemKartiIkon {
+  color: #fff;
+}
+.donemKartiOzel {
+  grid-column: 1 / -1;
 }
