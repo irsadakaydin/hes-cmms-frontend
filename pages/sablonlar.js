@@ -236,20 +236,44 @@ export default function SablonlarSayfasi() {
   // ---- Klasöre göre şablon görüntüleme — sabit yolu (Elektromekanik >
   // Ünite NUMARASINA göre toplar — Türbin'in, Generatör'ün, HPU'nun vb.
   // "Ünite 1"i aynı grupta birleşir; tek bir ekipman yoluna bağlı değildir.
+  const [agacHicYok, setAgacHicYok] = useState(false);
+  const [agacKuruluyor, setAgacKuruluyor] = useState(false);
+
   const goruntuleUniteleriGetir = useCallback(async (santralId) => {
     if (!santralId) return;
     setGoruntuleUniteleri(null);
     setAcikUniteler({});
     setUniteSablonlari({});
     setGoruntuleHata(null);
+    setAgacHicYok(false);
     try {
       const veri = await istekAt(`/api/v1/santraller/${santralId}/unite-sablonlari`);
-      setGoruntuleUniteleri(veri.veri.map((u) => ({ klasor_id: `unite-${u.unite_no}`, ad: u.ad })));
+      const uniteler = veri.veri.map((u) => ({ klasor_id: `unite-${u.unite_no}`, ad: u.ad }));
+      setGoruntuleUniteleri(uniteler);
       setUniteSablonlari(Object.fromEntries(veri.veri.map((u) => [`unite-${u.unite_no}`, u.sablonlar])));
+      if (uniteler.length === 0) {
+        // Hiç "Ünite N" düğümü bulunamadıysa, bu santralde klasör ağacının
+        // hiç kurulmamış olup olmadığını kontrol edip kurulum önerisi
+        // gösteriyoruz.
+        const kokVeri = await istekAt(`/api/v1/santraller/${santralId}/klasorler`);
+        setAgacHicYok(kokVeri.veri.length === 0);
+      }
     } catch (err) {
       setGoruntuleHata(err.message);
     }
   }, []);
+
+  async function goruntuleAgaciKur() {
+    setAgacKuruluyor(true);
+    try {
+      await istekAt(`/api/v1/santraller/${goruntuleSantralId}/klasor-agaci-yukle`, { method: "POST" });
+      await goruntuleUniteleriGetir(goruntuleSantralId);
+    } catch (err) {
+      setGoruntuleHata(err.message);
+    } finally {
+      setAgacKuruluyor(false);
+    }
+  }
 
   useEffect(() => {
     if (goruntuleSantralId) goruntuleUniteleriGetir(goruntuleSantralId);
@@ -602,8 +626,16 @@ export default function SablonlarSayfasi() {
 
             {goruntuleSantralId && !goruntuleUniteleri && <div className="yukleniyor">Yükleniyor…</div>}
 
-            {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && (
-              <div className="bosDurum">Bu yolda ünite klasörü bulunamadı.</div>
+            {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && agacHicYok && (
+              <div className="bosDurum">
+                Bu santralde henüz klasör ağacı kurulmamış.{" "}
+                <button type="button" className="linkButon" onClick={goruntuleAgaciKur} disabled={agacKuruluyor}>
+                  {agacKuruluyor ? "Kuruluyor…" : "Standart HES klasör ağacını kur"}
+                </button>
+              </div>
+            )}
+            {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && !agacHicYok && (
+              <div className="bosDurum">Bu santralde "Ünite N" olarak organize edilmiş bir klasör bulunamadı.</div>
             )}
 
             {goruntuleUniteleri &&
