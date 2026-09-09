@@ -227,6 +227,7 @@ export default function EkipmanListesiSayfasi() {
                 santralId={seciliSantralId}
                 santralAdi={(santraller || []).find((s) => s.santral_id === seciliSantralId)?.ad}
                 mod="ekipman"
+                gorunum="liste"
                 onSecim={klasordekiEkipmanlariGetir}
               />
             </div>
