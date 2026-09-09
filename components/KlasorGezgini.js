@@ -71,11 +71,22 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
       <div className="agacKokEtiketi">{santralAdi || "Santral"}</div>
 
       {kurulumOneriliyor && (
-        <div className="bosDurum" style={{ marginBottom: "10px" }}>
-          Bu santralde henüz klasör yok.{" "}
-          <button type="button" className="linkButon" onClick={standartAgaciKur} disabled={kuruluyor}>
-            {kuruluyor ? "Kuruluyor…" : "Standart HES klasör ağacını kur"}
-          </button>
+        <div className="klasorBosDurumKutusu">
+          <svg className="klasorBosDurumIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11.5 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <path d="M12 10.5V15.5M9.5 13H14.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <div>
+            <div className="klasorBosDurumMetin">Bu santralde henüz klasör yok.</div>
+            <button type="button" className="klasorSecButon" onClick={standartAgaciKur} disabled={kuruluyor}>
+              {kuruluyor ? "Kuruluyor…" : "Standart HES klasör ağacını kur"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -98,7 +109,7 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
         </div>
       )}
 
-      {!kurulumOneriliyor && (
+      {(
         <YeniKlasorSatiri
           etiket={`Bu seviyeye eklenir: ${santralAdi || "Kök"}`}
           acikMi={kokYeniKlasorAcik}
@@ -307,8 +318,17 @@ function YeniKlasorSatiri({ etiket, acikMi, setAcikMi, onEkle }) {
 
   if (!acikMi) {
     return (
-      <button type="button" className="linkButon" onClick={() => setAcikMi(true)} style={{ marginTop: "4px" }}>
-        + Yeni Klasör Ekle
+      <button type="button" className="klasorEkleButon" onClick={() => setAcikMi(true)}>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="15" height="15">
+          <path
+            d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11.5 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path d="M12 10.5V15.5M9.5 13H14.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        Yeni Klasör Ekle
       </button>
     );
   }
