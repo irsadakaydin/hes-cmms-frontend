@@ -88,7 +88,7 @@ export default function EkipmanListesiSayfasi() {
 
   async function listeyiYenile() {
     if (tumListeModu) {
-      await listeyiYenile();
+      await ekipmanlariGetir(seciliSantralId);
     } else if (seciliKlasorId) {
       await klasordekiEkipmanlariGetir({ klasor_id: seciliKlasorId });
     }
