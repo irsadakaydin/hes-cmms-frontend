@@ -1162,108 +1162,109 @@ h1, h2, h3 {
   flex-shrink: 0;
 }
 
-/* ---------- Klasör Gezgini — breadcrumb + kart ızgarası ---------- */
-.klasorBreadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  margin-bottom: 12px;
+/* ---------- Klasör Gezgini — yumuşak geçişli açılır/kapanır ağaç ---------- */
+.agacKokEtiketi {
   font-size: 13.5px;
+  font-weight: 700;
+  color: var(--teal-deep);
+  margin-bottom: 10px;
 }
-.klasorBreadcrumbAdim,
-.klasorBreadcrumbAktif {
+
+.agacGovde {
+  margin-bottom: 6px;
+}
+
+.agacDugumu {
+  margin-bottom: 1px;
+}
+
+.agacSatiri {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+.agacSatiri:hover {
+  background: var(--paper);
+}
+
+.agacSatirButonu {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 3px 4px;
-  border-radius: 6px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  text-align: left;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.klasorBreadcrumbAdim {
-  color: var(--ink-soft);
-  font-weight: 500;
+.agacSatirButonu:hover {
+  background: rgba(11, 46, 47, 0.06);
 }
-.klasorBreadcrumbAdim:hover {
+.agacSatirButonuSecili {
   background: var(--paper);
-  color: var(--teal-deep);
-}
-.klasorBreadcrumbAktif {
-  color: var(--teal-deep);
-  font-weight: 700;
-}
-.klasorBreadcrumbAyrac {
-  color: var(--line-strong);
-  margin: 0 2px;
+  box-shadow: inset 0 0 0 1.5px var(--teal-deep);
 }
 
-.klasorKartIzgara {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding-bottom: 6px;
-}
-
-.klasorKart {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  width: 132px;
+.agacOk {
+  display: inline-block;
+  width: 14px;
   flex-shrink: 0;
+  font-size: 15px;
+  color: var(--ink-soft);
+  transition: transform 0.22s ease;
+}
+.agacOkAcik {
+  transform: rotate(90deg);
+}
+.agacOkGizli {
+  visibility: hidden;
 }
 
-.klasorKartGovde {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 92px;
-  background: radial-gradient(circle at 35% 30%, #f2c98a, #c17a24);
-  border: 1.5px solid #a8681c;
-  border-radius: 12px;
-  padding: 14px 8px 10px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, filter 0.2s ease;
-}
-.klasorKartGovde:hover {
-  box-shadow: 0 6px 16px rgba(161, 100, 28, 0.35);
-  transform: translateY(-2px);
-  filter: brightness(1.05);
-}
-.klasorKartGovdeSecili {
-  border-color: var(--teal-deep);
-  box-shadow: 0 0 0 2px var(--teal-deep);
-}
-
-.klasorKartIkon {
-  width: 30px;
-  height: 30px;
-  color: #fff;
+.agacKlasorIkon {
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  transition: transform 0.2s ease;
-}
-.klasorKartGovde:hover .klasorKartIkon {
-  transform: scale(1.08);
+  color: var(--amber);
 }
 
-.klasorKartAd {
-  font-size: 12.5px;
-  font-weight: 700;
+.agacAd {
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--ink);
-  text-align: center;
-  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.klasorKartEtiket {
+.agacEtiket {
   font-size: 10.5px;
-  color: #5b3a10;
-  background: rgba(255, 255, 255, 0.75);
+  color: var(--ink-soft);
+  background: var(--surface);
   border-radius: 999px;
   padding: 1px 8px;
+  flex-shrink: 0;
+}
+
+/* Açılır/kapanır alt içerik — grid-template-rows 0fr↔1fr tekniğiyle
+   yüksekliği bilinmeyen içerik bile yumuşak geçişle açılıp kapanır. */
+.agacAltSarmalayici {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+.agacAltSarmalayiciAcik {
+  grid-template-rows: 1fr;
+}
+.agacAltIcerik {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .klasorSecButon,
@@ -1277,6 +1278,8 @@ h1, h2, h3 {
   border-radius: 999px;
   cursor: pointer;
   text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 .klasorSecButon:hover {
@@ -1295,11 +1298,11 @@ h1, h2, h3 {
   border: 1.5px solid transparent;
   background: transparent;
   color: var(--red, #a83b2e);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
+  font-size: 13px;
+  padding: 4px 7px;
   border-radius: 999px;
   cursor: pointer;
+  flex-shrink: 0;
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 .klasorSilButon:hover {
@@ -1308,6 +1311,7 @@ h1, h2, h3 {
   color: #fff;
   transform: translateY(-1px);
 }
+
 
 /* ---------- Özet Banner — Dönem seçici (sabit ızgara, açılır değil) ---------- */
 .donemIzgara {
