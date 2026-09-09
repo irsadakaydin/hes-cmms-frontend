@@ -12,7 +12,8 @@ import { istekAt } from "../lib/api";
  * mod="ekipman"  → yalnızca PERİYOT OLMAYAN düğümler seçilebilir.
  * mod="sablon"   → yalnızca PERİYOT YAPRAKLARI seçilebilir.
  */
-export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, seciliKlasorId }) {
+export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, seciliKlasorId, gorunum }) {
+  const listeGorunumu = gorunum === "liste";
   const [yol, setYol] = useState([]); // breadcrumb: [{klasor_id, ad}, ...]
   const [cocuklar, setCocuklar] = useState(null);
   const [hata, setHata] = useState(null);
@@ -174,7 +175,43 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
 
       {!cocuklar && !kurulumOneriliyor && <div className="yukleniyor">Yükleniyor…</div>}
 
-      {cocuklar && cocuklar.length > 0 && (
+      {cocuklar && cocuklar.length > 0 && listeGorunumu && (
+        <div>
+          {cocuklar.map((k) => (
+            <div key={k.klasor_id} style={{ marginBottom: "4px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  className="periyotGrupBasligi"
+                  style={{ flex: 1, textAlign: "left", fontWeight: seciliKlasorId === k.klasor_id ? 700 : 500 }}
+                  onClick={() => kartaTiklaninca(k)}
+                >
+                  {mod === "ekipman" && k.alt_periyot_mu
+                    ? seciliKlasorId === k.klasor_id
+                      ? "▾"
+                      : "▸"
+                    : Number(k.alt_sayisi) > 0
+                    ? "▸"
+                    : "·"}{" "}
+                  {k.ad}
+                  {mod === "ekipman" && Number(k.ekipman_sayisi) > 0 && ` (${k.ekipman_sayisi} ekipman)`}
+                  {mod === "sablon" && k.periyot_tipi && Number(k.sablon_sayisi) > 0 && ` (${k.sablon_sayisi} şablon)`}
+                </button>
+                {secilebilirMi(k) && seciliKlasorId !== k.klasor_id && (
+                  <button type="button" className="klasorSecButon" onClick={() => onSecim(k)}>
+                    Bunu Seç
+                  </button>
+                )}
+                <button type="button" className="klasorSilButon" onClick={() => klasoruSil(k)} title="Klasörü sil">
+                  🗑
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cocuklar && cocuklar.length > 0 && !listeGorunumu && (
         <div className="klasorKartIzgara">
           {cocuklar.map((k) => (
             <div key={k.klasor_id} className="klasorKart">
