@@ -90,14 +90,16 @@ export default function SablonlarSayfasi() {
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
   const [acikGruplar, setAcikGruplar] = useState({}); // "santralAnahtari|periyot" -> bool
-  const [kopyaAcikSablonId, setKopyaAcikSablonId] = useState(null);
-  const [kopyaHedefHoldingId, setKopyaHedefHoldingId] = useState("");
+  const [kopyalaModalAcik, setKopyalaModalAcik] = useState(false);
+  const [kopyalaKaynakHoldingId, setKopyalaKaynakHoldingId] = useState("");
 
   const [formuAcik, setFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosSablon(kendiIsletmeId));
   const [duzenlenenSablonId, setDuzenlenenSablonId] = useState(null);
   const [acikKarekodId, setAcikKarekodId] = useState(null);
+  const [icerikAcikSablonId, setIcerikAcikSablonId] = useState(null);
+  const [icerikDetaylari, setIcerikDetaylari] = useState({});
   const [klasorYolu, setKlasorYolu] = useState("");
   const [sablonEkipmanId, setSablonEkipmanId] = useState("");
   const [sablonEkipmanKlasorId, setSablonEkipmanKlasorId] = useState("");
@@ -571,10 +573,25 @@ export default function SablonlarSayfasi() {
       });
       const hedefAdi = isletmeler?.find((h) => h.isletme_id === hedefHoldingId)?.ad || "seçilen holdinge";
       setBilgi(`"${sablon.ad}" ${hedefAdi} kopyalandı.`);
-      setKopyaAcikSablonId(null);
       await verileriYukle();
     } catch (err) {
       setHata(err.message);
+    }
+  }
+
+  async function sablonIcerigiAcKapa(sablonId) {
+    if (icerikAcikSablonId === sablonId) {
+      setIcerikAcikSablonId(null);
+      return;
+    }
+    setIcerikAcikSablonId(sablonId);
+    if (!icerikDetaylari[sablonId]) {
+      try {
+        const veri = await istekAt(`/api/v1/bakim-sablonlari/${sablonId}`);
+        setIcerikDetaylari((o) => ({ ...o, [sablonId]: veri.checklist_json?.kalemler || [] }));
+      } catch (err) {
+        setHata(err.message);
+      }
     }
   }
 
@@ -607,6 +624,17 @@ export default function SablonlarSayfasi() {
                 <button className="kucukButon" onClick={yeniSablonBaslat}>
                   + Elle Oluştur
                 </button>
+                {platformAdminMi && (
+                  <button
+                    className="kucukButon"
+                    onClick={() => {
+                      setKopyalaModalAcik(true);
+                      setKopyalaKaynakHoldingId("");
+                    }}
+                  >
+                    Diğer Holdinglerden Kopyala
+                  </button>
+                )}
               </div>
             )}
             <input
@@ -687,16 +715,9 @@ export default function SablonlarSayfasi() {
 
             {goruntuleSantralId && (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <h3 style={{ marginTop: 0, marginBottom: "2px" }}>
-                    {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
-                  </h3>
-                  <div className="gorevAlt" style={{ marginBottom: "8px" }}>
-                    "Ünite N" olarak organize edilmiş TÜM ekipmanları (Türbin, Generatör, HPU vb.) kapsar — Ünite
-                    ayrımı olmayan ortak ekipmanlar (ör. Trafolar, Şalt Sahası) bu listede yer almaz, bu yüzden
-                    aşağıdaki tam listeden toplamı yine de farklı olabilir.
-                  </div>
-                </div>
+                <h3 style={{ margin: 0 }}>
+                  {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
+                </h3>
                 <button
                   type="button"
                   className="linkButon"
@@ -718,7 +739,7 @@ export default function SablonlarSayfasi() {
               </div>
             )}
             {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && !agacHicYok && (
-              <div className="bosDurum">Bu santralde "Ünite N" olarak organize edilmiş bir klasör bulunamadı.</div>
+              <div className="bosDurum">Bu santralde ünite bulunamadı.</div>
             )}
 
             {goruntuleUniteleri &&
@@ -1017,7 +1038,13 @@ export default function SablonlarSayfasi() {
                             sablonListesi.map((s) => (
                               <div className="satirKart" key={s.sablon_id} style={{ marginLeft: "18px" }}>
                                 <div>
-                                  <strong>{s.ad}</strong>
+                                  <button
+                                    type="button"
+                                    className="sablonAdiTiklama"
+                                    onClick={() => sablonIcerigiAcKapa(s.sablon_id)}
+                                  >
+                                    <strong>{s.ad}</strong>
+                                  </button>
                                   {!s.aktif_mi && (
                                     <span className="rozet rozet-GECIKTI" style={{ marginLeft: 8 }}>
                                       Pasif
@@ -1038,6 +1065,20 @@ export default function SablonlarSayfasi() {
                                   {s.ekipman_tipi}
                                   {s.unite_no ? ` · Ünite ${s.unite_no}` : ""} · v{s.versiyon}
                                 </div>
+                                {icerikAcikSablonId === s.sablon_id && (
+                                  <div style={{ margin: "8px 0", paddingLeft: "4px" }}>
+                                    {!icerikDetaylari[s.sablon_id] && <div className="yukleniyor">Yükleniyor…</div>}
+                                    {icerikDetaylari[s.sablon_id] && icerikDetaylari[s.sablon_id].length === 0 && (
+                                      <div className="bosDurum">Bu şablonda hiç kontrol maddesi yok.</div>
+                                    )}
+                                    {icerikDetaylari[s.sablon_id] &&
+                                      icerikDetaylari[s.sablon_id].map((k, i) => (
+                                        <div key={k.id || i} className="gorevAlt" style={{ padding: "3px 0" }}>
+                                          {i + 1}. {k.soru}
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
                                 <div className="kullaniciAlt">
                                   <button className="linkButon" onClick={() => duzenlemeyiBaslat(s)}>
                                     Düzenle
@@ -1097,74 +1138,72 @@ export default function SablonlarSayfasi() {
                   </div>
                 ))}
 
-              {platformAdminMi &&
-                digerHoldingSablonlari &&
-                digerHoldingSablonlari.filter((s) => s.isletme_id !== seciliHoldingId).length > 0 && (
-                  <div style={{ marginTop: "28px" }}>
-                    <h3 className="holdingBasligi">Diğer Holdinglerden Kopyala</h3>
-                    {digerHoldingSablonlari
-                      .filter((s) => s.isletme_id !== seciliHoldingId)
-                      .map((s) => (
-                      <div className="satirKart" key={s.sablon_id}>
-                        <div>
-                          <strong>{s.ad}</strong>
-                          <span className="gorevAlt"> — {s.isletme_adi}</span>
-                        </div>
-                        <div className="gorevAlt">
-                          {s.ekipman_adi ? `${s.ekipman_adi} — ` : ""}
-                          {s.ekipman_tipi}
-                          {s.unite_no ? ` · Ünite ${s.unite_no}` : ""} ·{" "}
-                          {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
-                        </div>
-                        <div className="kullaniciAlt">
-                          {kopyaAcikSablonId === s.sablon_id ? (
-                            <>
-                              <select
-                                value={kopyaHedefHoldingId}
-                                onChange={(e) => setKopyaHedefHoldingId(e.target.value)}
-                                style={{ fontSize: "12px", padding: "4px", marginRight: "10px" }}
-                              >
-                                <option value="">Hedef holding seçin…</option>
-                                {isletmeler &&
-                                  isletmeler
-                                    .filter((h) => h.isletme_id !== s.isletme_id)
-                                    .map((h) => (
-                                      <option key={h.isletme_id} value={h.isletme_id}>
-                                        {h.ad}
-                                      </option>
-                                    ))}
-                              </select>
-                              <button
-                                className="linkButon"
-                                disabled={!kopyaHedefHoldingId}
-                                onClick={() => sablonKopyala(s, kopyaHedefHoldingId)}
-                              >
-                                Kopyala
-                              </button>
-                              <button className="linkButon" onClick={() => setKopyaAcikSablonId(null)}>
-                                Vazgeç
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              className="linkButon"
-                              onClick={() => {
-                                setKopyaAcikSablonId(s.sablon_id);
-                                setKopyaHedefHoldingId(seciliHoldingId || "");
-                              }}
-                            >
-                              Bir Holdinge Kopyala
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
             </>
           )}
         </div>
       </div>
+
+      {kopyalaModalAcik && (
+        <div className="modalOrtu" onClick={() => setKopyalaModalAcik(false)}>
+          <div className="modalKutu" onClick={(e) => e.stopPropagation()}>
+            <div className="modalBaslikSirasi">
+              <h3 style={{ margin: 0 }}>Diğer Holdinglerden Kopyala</h3>
+              <button className="modalKapatButonu" onClick={() => setKopyalaModalAcik(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="alan">
+              <label>Holding</label>
+              <select value={kopyalaKaynakHoldingId} onChange={(e) => setKopyalaKaynakHoldingId(e.target.value)}>
+                <option value="">Bir holding seçin…</option>
+                {isletmeler &&
+                  isletmeler
+                    .filter((h) => h.isletme_id !== seciliHoldingId)
+                    .map((h) => (
+                      <option key={h.isletme_id} value={h.isletme_id}>
+                        {h.ad}
+                      </option>
+                    ))}
+              </select>
+            </div>
+
+            {kopyalaKaynakHoldingId &&
+              (() => {
+                const listeler = (digerHoldingSablonlari || []).filter(
+                  (s) => s.isletme_id === kopyalaKaynakHoldingId
+                );
+                if (listeler.length === 0) {
+                  return <div className="bosDurum">Bu holdingde henüz bir bakım şablonu yok.</div>;
+                }
+                return listeler.map((s) => (
+                  <div className="satirKart" key={s.sablon_id}>
+                    <div>
+                      <strong>{s.ad}</strong>
+                    </div>
+                    <div className="gorevAlt">
+                      {s.ekipman_adi ? `${s.ekipman_adi} — ` : ""}
+                      {s.ekipman_tipi}
+                      {s.unite_no ? ` · Ünite ${s.unite_no}` : ""} · {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}
+                    </div>
+                    <div className="kullaniciAlt">
+                      <button
+                        className="linkButon"
+                        disabled={!seciliHoldingId}
+                        onClick={async () => {
+                          await sablonKopyala(s, seciliHoldingId);
+                          setKopyalaModalAcik(false);
+                        }}
+                      >
+                        {seciliHoldingId ? "Bu Holdinge Kopyala" : "Önce hedef holding seçin"}
+                      </button>
+                    </div>
+                  </div>
+                ));
+              })()}
+          </div>
+        </div>
+      )}
     </>
   );
 }
