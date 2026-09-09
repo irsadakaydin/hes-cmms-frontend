@@ -55,10 +55,10 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
     }
   }
 
-  async function kokYeniKlasorEkle(ad) {
+  async function kokYeniKlasorEkle(ad, periyot_tipi) {
     await istekAt(`/api/v1/santraller/${santralId}/klasorler`, {
       method: "POST",
-      body: JSON.stringify({ ust_klasor_id: null, ad }),
+      body: JSON.stringify({ ust_klasor_id: null, ad, periyot_tipi }),
     });
     setKokYeniKlasorAcik(false);
     await kokleriGetir();
@@ -181,10 +181,10 @@ function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId,
     }
   }
 
-  async function yeniAltKlasorEkle(ad) {
+  async function yeniAltKlasorEkle(ad, periyot_tipi) {
     await istekAt(`/api/v1/santraller/${santralId}/klasorler`, {
       method: "POST",
-      body: JSON.stringify({ ust_klasor_id: klasor.klasor_id, ad }),
+      body: JSON.stringify({ ust_klasor_id: klasor.klasor_id, ad, periyot_tipi }),
     });
     setYeniKlasorAcik(false);
     setCocuklar(null);
@@ -274,8 +274,22 @@ function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId,
 
 /** "+ Yeni Klasör Ekle" satırı — hem kök seviyede hem her düğümün altında
  * kullanılan ortak parça. */
+const PERIYOT_SECENEKLERI = {
+  GUNLUK: "Günlük",
+  HAFTALIK: "Haftalık",
+  AYLIK: "Aylık",
+  UC_AYLIK: "3 Ayda Bir",
+  ALTI_AYLIK: "6 Ayda Bir",
+  YILLIK: "Yıllık",
+  IKI_YILLIK: "2 Yılda Bir",
+  UC_YILLIK: "3 Yılda Bir",
+  BES_YILLIK: "5 Yılda Bir",
+  ON_YILLIK: "10 Yılda Bir",
+};
+
 function YeniKlasorSatiri({ etiket, acikMi, setAcikMi, onEkle }) {
   const [ad, setAd] = useState("");
+  const [periyot, setPeriyot] = useState("");
   const [gonderiliyor, setGonderiliyor] = useState(false);
 
   async function gonder(e) {
@@ -283,8 +297,9 @@ function YeniKlasorSatiri({ etiket, acikMi, setAcikMi, onEkle }) {
     if (!ad.trim()) return;
     setGonderiliyor(true);
     try {
-      await onEkle(ad.trim());
+      await onEkle(ad.trim(), periyot || null);
       setAd("");
+      setPeriyot("");
     } finally {
       setGonderiliyor(false);
     }
@@ -308,6 +323,17 @@ function YeniKlasorSatiri({ etiket, acikMi, setAcikMi, onEkle }) {
           onChange={(e) => setAd(e.target.value)}
           placeholder="Ör. Ünite 5, ya da yeni bir ekipman grubu…"
         />
+      </div>
+      <div className="alan" style={{ width: "190px", marginBottom: 0 }}>
+        <label>Periyot (bu bir periyot yaprağıysa)</label>
+        <select value={periyot} onChange={(e) => setPeriyot(e.target.value)}>
+          <option value="">— Sadece klasör —</option>
+          {Object.entries(PERIYOT_SECENEKLERI).map(([deger, ad2]) => (
+            <option key={deger} value={deger}>
+              {ad2}
+            </option>
+          ))}
+        </select>
       </div>
       <button className="birincilButon" style={{ width: "auto" }} disabled={gonderiliyor}>
         Ekle
