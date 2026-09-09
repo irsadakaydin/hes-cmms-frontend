@@ -190,10 +190,8 @@ export default function SablonlarSayfasi() {
   );
 
   // ---- Klasöre göre şablon görüntüleme — sabit yolu (Elektromekanik >
-  // Turbin > Türbin) doğrudan bulup Ünite 1-4'ü yan yana gösterir; tek tek
-  // klasöre tıklayarak gezinmeye gerek yok.
-  const SABIT_YOL = ["Elektromekanik", "Turbin", "Türbin"];
-
+  // Ünite NUMARASINA göre toplar — Türbin'in, Generatör'ün, HPU'nun vb.
+  // "Ünite 1"i aynı grupta birleşir; tek bir ekipman yoluna bağlı değildir.
   const goruntuleUniteleriGetir = useCallback(async (santralId) => {
     if (!santralId) return;
     setGoruntuleUniteleri(null);
@@ -201,33 +199,9 @@ export default function SablonlarSayfasi() {
     setUniteSablonlari({});
     setGoruntuleHata(null);
     try {
-      let ustId = null;
-      for (const adim of SABIT_YOL) {
-        const p = ustId ? `?ust_klasor_id=${ustId}` : "";
-        const veri = await istekAt(`/api/v1/santraller/${santralId}/klasorler${p}`);
-        const bulunan = veri.veri.find((k) => k.ad.toLowerCase() === adim.toLowerCase());
-        if (!bulunan) {
-          setGoruntuleUniteleri([]);
-          setGoruntuleHata(`Bu santralde "${SABIT_YOL.join(" > ")}" klasör yolu bulunamadı.`);
-          return;
-        }
-        ustId = bulunan.klasor_id;
-      }
-      const sonVeri = await istekAt(`/api/v1/santraller/${santralId}/klasorler?ust_klasor_id=${ustId}`);
-      setGoruntuleUniteleri(sonVeri.veri);
-      // Her ünitenin şablon sayısını (kapalıyken de görünsün diye) hemen,
-      // toplu olarak çekiyoruz.
-      const girdiler = await Promise.all(
-        sonVeri.veri.map(async (k) => {
-          try {
-            const s = await istekAt(`/api/v1/klasorler/${k.klasor_id}/sablonlar-alt-agacta`);
-            return [k.klasor_id, s.veri];
-          } catch {
-            return [k.klasor_id, []];
-          }
-        })
-      );
-      setUniteSablonlari(Object.fromEntries(girdiler));
+      const veri = await istekAt(`/api/v1/santraller/${santralId}/unite-sablonlari`);
+      setGoruntuleUniteleri(veri.veri.map((u) => ({ klasor_id: `unite-${u.unite_no}`, ad: u.ad })));
+      setUniteSablonlari(Object.fromEntries(veri.veri.map((u) => [`unite-${u.unite_no}`, u.sablonlar])));
     } catch (err) {
       setGoruntuleHata(err.message);
     }
@@ -542,8 +516,9 @@ export default function SablonlarSayfasi() {
                     {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
                   </h3>
                   <div className="gorevAlt" style={{ marginBottom: "8px" }}>
-                    Yalnızca {SABIT_YOL.join(" > ")} yoluna ait şablonlar — santraldeki diğer ekipman tiplerini
-                    (Generatör, Trafo, Vana vb.) kapsamaz, bu yüzden aşağıdaki tam listeden toplamı farklı olabilir.
+                    "Ünite N" olarak organize edilmiş TÜM ekipmanları (Türbin, Generatör, HPU vb.) kapsar — Ünite
+                    ayrımı olmayan ortak ekipmanlar (ör. Trafolar, Şalt Sahası) bu listede yer almaz, bu yüzden
+                    aşağıdaki tam listeden toplamı yine de farklı olabilir.
                   </div>
                 </div>
                 <button
