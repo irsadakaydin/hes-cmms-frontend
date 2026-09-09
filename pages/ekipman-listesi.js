@@ -305,6 +305,15 @@ export default function EkipmanListesiSayfasi() {
                         Pasif
                       </span>
                     )}
+                    {!e.klasor_id && (
+                      <span
+                        className="rozet rozet-GECIKTI"
+                        style={{ marginLeft: 8 }}
+                        title="Bu ekipman henüz klasör ağacındaki bir konuma bağlı değil — Klasör olarak gösterirken görünmez. Düzenleyip klasör konumunu seçin."
+                      >
+                        ⚠ Klasöre bağlı değil
+                      </span>
+                    )}
                   </div>
                   <div className="gorevAlt">
                     {e.uretici && `${e.uretici} `}
