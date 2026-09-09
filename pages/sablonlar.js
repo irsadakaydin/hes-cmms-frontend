@@ -185,6 +185,50 @@ export default function SablonlarSayfasi() {
       .catch((err) => setHata(err.message));
   }, [formuAcik, taslak.santral_id, duzenlenenSablonId]);
 
+  async function sablonEkipmanSecildi(ekipmanId) {
+    setSablonEkipmanId(ekipmanId);
+    setTaslak((t) => ({ ...t, klasor_id: "", periyot_tipi: "" }));
+    setKlasorYolu("");
+    setSablonPeriyotYapraklari(null);
+    const ek = (santralEkipmanlari || []).find((x) => x.ekipman_id === ekipmanId);
+    if (ek && ek.klasor_id) {
+      try {
+        const veri = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/periyot-yapraklari`);
+        setSablonPeriyotYapraklari(veri.veri);
+        const yol = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/yol`);
+        setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
+      } catch (err) {
+        setHata(err.message);
+      }
+    }
+  }
+
+  // Başka bir sayfadan ("Bu ekipman için henüz şablon yok" bağlantısıyla)
+  // gelindiyse — santral_id/ekipman_id/donus adresini URL'den okuyup formu
+  // otomatik dolduruyoruz ve kaydedince geri dönülecek adresi saklıyoruz.
+  const [donusYolu, setDonusYolu] = useState(null);
+  const [baglamdanGeldi, setBaglamdanGeldi] = useState(false);
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { santral_id, ekipman_id, donus } = router.query;
+    if (donus) setDonusYolu(donus);
+    if (santral_id && ekipman_id && !baglamdanGeldi) {
+      setBaglamdanGeldi(true);
+      setFormuAcik(true);
+      setTaslak((t) => ({ ...t, santral_id }));
+    }
+  }, [router.isReady, router.query, baglamdanGeldi]);
+
+  // santralEkipmanlari yüklenince (yukarıdaki efekt santral_id'yi
+  // ayarladıktan sonra), bağlamdan gelen ekipmanı otomatik seçiyoruz.
+  useEffect(() => {
+    if (baglamdanGeldi && router.query.ekipman_id && santralEkipmanlari && !sablonEkipmanId) {
+      const varMi = santralEkipmanlari.find((e) => e.ekipman_id === router.query.ekipman_id);
+      if (varMi) sablonEkipmanSecildi(router.query.ekipman_id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [santralEkipmanlari, baglamdanGeldi]);
+
   const gosterilecekSantraller = (tumSantraller || []).filter(
     (s) => s.isletme_id === (platformAdminMi ? seciliHoldingId : kendiIsletmeId)
   );
@@ -464,6 +508,14 @@ export default function SablonlarSayfasi() {
       <div className="sayfa">
         <UstBar />
         <div className="icerik">
+          {donusYolu && (
+            <div className="basariliKutu" style={{ marginBottom: "14px" }}>
+              Bu sayfaya, bir ekipman için şablon eklemeniz üzere yönlendirildiniz.{" "}
+              <button type="button" className="linkButon" style={{ fontWeight: 700 }} onClick={() => router.push(donusYolu)}>
+                ◀ Şimdi geri dön
+              </button>
+            </div>
+          )}
           <div className="bolumBaslik">
             <h2>Bakım Şablonları</h2>
             {(!platformAdminMi || seciliHoldingId) && (
@@ -487,7 +539,24 @@ export default function SablonlarSayfasi() {
 
           {goruntuleHata && <div className="hataKutusu">{goruntuleHata}</div>}
           {hata && <div className="hataKutusu">{hata}</div>}
-          {bilgi && <div className="basariliKutu">{bilgi}</div>}
+          {bilgi && (
+            <div className="basariliKutu">
+              {bilgi}
+              {donusYolu && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="linkButon"
+                    style={{ fontWeight: 700 }}
+                    onClick={() => router.push(donusYolu)}
+                  >
+                    ◀ Geldiğiniz sayfaya geri dönün
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="yonetimFormu" style={{ background: "var(--surface)" }}>
             {goruntuleSantraller && goruntuleSantraller.length > 1 && (
@@ -633,24 +702,7 @@ export default function SablonlarSayfasi() {
                     <select
                       required
                       value={sablonEkipmanId}
-                      onChange={async (e) => {
-                        const ekipmanId = e.target.value;
-                        setSablonEkipmanId(ekipmanId);
-                        setTaslak((t) => ({ ...t, klasor_id: "", periyot_tipi: "" }));
-                        setKlasorYolu("");
-                        setSablonPeriyotYapraklari(null);
-                        const ek = (santralEkipmanlari || []).find((x) => x.ekipman_id === ekipmanId);
-                        if (ek && ek.klasor_id) {
-                          try {
-                            const veri = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/periyot-yapraklari`);
-                            setSablonPeriyotYapraklari(veri.veri);
-                            const yol = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/yol`);
-                            setKlasorYolu(yol.veri.map((y) => y.ad).join(" > "));
-                          } catch (err) {
-                            setHata(err.message);
-                          }
-                        }
-                      }}
+                      onChange={(e) => sablonEkipmanSecildi(e.target.value)}
                     >
                       <option value="">Seçin…</option>
                       {(santralEkipmanlari || []).map((ek) => (
