@@ -8,6 +8,21 @@ function bosForm() {
   return { ad: "", alan_adi: "", ilk_admin_ad_soyad: "", ilk_admin_eposta: "", ilk_admin_sifre: "" };
 }
 
+// İşletme adından otomatik, GEÇERLİ bir "Alan Adı" (slug) üretir — küçük
+// harfe çevirir, Türkçe karakterleri (ç,ğ,ı,ö,ş,ü) sadeleştirir, boşluk ve
+// izinsiz karakterleri tireye dönüştürür. Backend yalnızca a-z/0-9/tire
+// kabul ettiği için, kullanıcı bu alanı elle doğru biçimde girmek zorunda
+// kalmasın diye kullanılır.
+function slugUret(metin) {
+  const harfEslestirme = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" };
+  return metin
+    .toLowerCase()
+    .replace(/[çğıöşü]/g, (h) => harfEslestirme[h] || h)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 62);
+}
+
 export default function HoldinglerSayfasi() {
   const router = useRouter();
   const [holdingler, setHoldingler] = useState(null);
@@ -16,6 +31,7 @@ export default function HoldinglerSayfasi() {
   const [formuAcik, setFormuAcik] = useState(false);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosForm());
+  const [alanAdiElleDegisti, setAlanAdiElleDegisti] = useState(false);
 
   const verileriYukle = useCallback(async () => {
     try {
@@ -64,6 +80,7 @@ export default function HoldinglerSayfasi() {
         setBilgi("Holding oluşturuldu.");
       }
       setTaslak(bosForm());
+      setAlanAdiElleDegisti(false);
       setFormuAcik(false);
       await verileriYukle();
     } catch (err) {
@@ -131,16 +148,30 @@ export default function HoldinglerSayfasi() {
                 <input
                   required
                   value={taslak.ad}
-                  onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
+                  onChange={(e) => {
+                    const yeniAd = e.target.value;
+                    setTaslak((t) => ({
+                      ...t,
+                      ad: yeniAd,
+                      // Kullanıcı "Alan adı"nı henüz elle değiştirmediyse,
+                      // holding adından otomatik ve GEÇERLİ bir slug türetip
+                      // dolduruyoruz — böylece format hatası (büyük harf,
+                      // boşluk, Türkçe karakter) hiç oluşmaz.
+                      alan_adi: alanAdiElleDegisti ? t.alan_adi : slugUret(yeniAd),
+                    }));
+                  }}
                   placeholder="Ör. Energo-Pro Holding"
                 />
               </div>
               <div className="alan">
-                <label>Alan adı (slug — küçük harf, boşluksuz)</label>
+                <label>Alan adı (slug — küçük harf, boşluksuz, otomatik doldurulur)</label>
                 <input
                   required
                   value={taslak.alan_adi}
-                  onChange={(e) => setTaslak({ ...taslak, alan_adi: e.target.value })}
+                  onChange={(e) => {
+                    setAlanAdiElleDegisti(true);
+                    setTaslak({ ...taslak, alan_adi: slugUret(e.target.value) });
+                  }}
                   placeholder="Ör. energo-pro-holding"
                 />
               </div>
