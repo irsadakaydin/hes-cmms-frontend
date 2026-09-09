@@ -536,10 +536,16 @@ export default function SablonlarSayfasi() {
             )}
 
             {goruntuleSantralId && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ marginTop: 0, marginBottom: "10px" }}>
-                  {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
-                </h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <h3 style={{ marginTop: 0, marginBottom: "2px" }}>
+                    {(goruntuleSantraller || []).find((s) => s.santral_id === goruntuleSantralId)?.ad}
+                  </h3>
+                  <div className="gorevAlt" style={{ marginBottom: "8px" }}>
+                    Yalnızca {SABIT_YOL.join(" > ")} yoluna ait şablonlar — santraldeki diğer ekipman tiplerini
+                    (Generatör, Trafo, Vana vb.) kapsamaz, bu yüzden aşağıdaki tam listeden toplamı farklı olabilir.
+                  </div>
+                </div>
                 <button
                   type="button"
                   className="linkButon"
