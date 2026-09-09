@@ -100,6 +100,8 @@ export default function SablonlarSayfasi() {
   const [acikKarekodId, setAcikKarekodId] = useState(null);
   const [klasorYolu, setKlasorYolu] = useState("");
   const [sablonEkipmanId, setSablonEkipmanId] = useState("");
+  const [sablonEkipmanKlasorId, setSablonEkipmanKlasorId] = useState("");
+  const [periyotOlusturuluyor, setPeriyotOlusturuluyor] = useState(false);
 
   // ---- Klasöre göre şablon görüntüleme (sabit yol: Elektromekanik > Turbin > Türbin) ----
   const [goruntuleSantralId, setGoruntuleSantralId] = useState("");
@@ -191,6 +193,7 @@ export default function SablonlarSayfasi() {
     setKlasorYolu("");
     setSablonPeriyotYapraklari(null);
     const ek = (santralEkipmanlari || []).find((x) => x.ekipman_id === ekipmanId);
+    setSablonEkipmanKlasorId(ek && ek.klasor_id ? ek.klasor_id : "");
     if (ek && ek.klasor_id) {
       try {
         const veri = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/periyot-yapraklari`);
@@ -200,6 +203,43 @@ export default function SablonlarSayfasi() {
       } catch (err) {
         setHata(err.message);
       }
+    }
+  }
+
+  // Periyot seçildiğinde: bu ekipmanın klasöründe o periyot için zaten bir
+  // yaprak varsa onu kullanır; yoksa — Ekipman Oluştur'a gidip elle klasör
+  // kurmaya gerek kalmadan — o yaprağı OTOMATİK OLARAK oluşturup kullanır.
+  async function periyotSecildi(periyotTipi) {
+    if (!periyotTipi) {
+      setTaslak((t) => ({ ...t, periyot_tipi: "", klasor_id: "" }));
+      return;
+    }
+    const mevcutYaprak = (sablonPeriyotYapraklari || []).find((p) => p.periyot_tipi === periyotTipi);
+    if (mevcutYaprak) {
+      setTaslak((t) => ({ ...t, periyot_tipi: periyotTipi, klasor_id: mevcutYaprak.klasor_id }));
+      return;
+    }
+    if (!sablonEkipmanKlasorId) {
+      setHata("Bu ekipmanın klasör konumu bulunamadı — Ekipman Oluştur'dan konumunu kontrol edin.");
+      return;
+    }
+    setPeriyotOlusturuluyor(true);
+    setHata(null);
+    try {
+      const yeniYaprak = await istekAt(`/api/v1/santraller/${taslak.santral_id}/klasorler`, {
+        method: "POST",
+        body: JSON.stringify({
+          ust_klasor_id: sablonEkipmanKlasorId,
+          ad: PERIYOT_ETIKETLERI[periyotTipi],
+          periyot_tipi: periyotTipi,
+        }),
+      });
+      setSablonPeriyotYapraklari((liste) => [...(liste || []), { ...yeniYaprak, sablon_sayisi: 0 }]);
+      setTaslak((t) => ({ ...t, periyot_tipi: periyotTipi, klasor_id: yeniYaprak.klasor_id }));
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setPeriyotOlusturuluyor(false);
     }
   }
 
@@ -358,6 +398,7 @@ export default function SablonlarSayfasi() {
               try {
                 const ekipmanlarVeri = await istekAt(`/api/v1/klasorler/${ustDugum.klasor_id}/ekipmanlar`);
                 if (ekipmanlarVeri.veri[0]) setSablonEkipmanId(ekipmanlarVeri.veri[0].ekipman_id);
+                setSablonEkipmanKlasorId(ustDugum.klasor_id);
                 const periyotVeri = await istekAt(`/api/v1/klasorler/${ustDugum.klasor_id}/periyot-yapraklari`);
                 setSablonPeriyotYapraklari(periyotVeri.veri);
               } catch {
@@ -783,32 +824,29 @@ export default function SablonlarSayfasi() {
 
                   {sablonEkipmanId && (
                     <div className="alan">
-                      <label>Periyot — bu ekipmanın klasöründeki periyotlardan seçin</label>
+                      <label>Periyot</label>
                       <select
                         required
-                        value={taslak.klasor_id}
-                        onChange={(e) => {
-                          const secilen = (sablonPeriyotYapraklari || []).find((p) => p.klasor_id === e.target.value);
-                          setTaslak((t) => ({
-                            ...t,
-                            klasor_id: e.target.value,
-                            periyot_tipi: secilen ? secilen.periyot_tipi : "",
-                          }));
-                        }}
+                        value={taslak.periyot_tipi}
+                        disabled={periyotOlusturuluyor}
+                        onChange={(e) => periyotSecildi(e.target.value)}
                       >
                         <option value="">Seçin…</option>
-                        {(sablonPeriyotYapraklari || []).map((p) => (
-                          <option key={p.klasor_id} value={p.klasor_id}>
-                            {p.ad}
-                            {Number(p.sablon_sayisi) > 0 ? ` (${p.sablon_sayisi} şablon var)` : ""}
-                          </option>
-                        ))}
+                        {Object.entries(PERIYOT_ETIKETLERI).map(([deger, etiket]) => {
+                          const mevcutYaprak = (sablonPeriyotYapraklari || []).find((p) => p.periyot_tipi === deger);
+                          return (
+                            <option key={deger} value={deger}>
+                              {etiket}
+                              {mevcutYaprak && Number(mevcutYaprak.sablon_sayisi) > 0
+                                ? ` (${mevcutYaprak.sablon_sayisi} şablon var)`
+                                : !mevcutYaprak
+                                ? " — yeni oluşturulacak"
+                                : ""}
+                            </option>
+                          );
+                        })}
                       </select>
-                      {sablonPeriyotYapraklari && sablonPeriyotYapraklari.length === 0 && (
-                        <div className="kutuphaneBosUyari">
-                          Bu ekipmanın klasöründe periyot tanımlı değil — klasör ağacınızı kontrol edin.
-                        </div>
-                      )}
+                      {periyotOlusturuluyor && <div className="gorevAlt">Periyot klasörü oluşturuluyor…</div>}
                     </div>
                   )}
                 </>
