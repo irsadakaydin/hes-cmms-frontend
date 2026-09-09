@@ -68,17 +68,17 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
 
   function kartaTiklaninca(k) {
     // Ekipman modunda, bu düğümün altı doğrudan periyot yapraklarıysa
-    // (Haftalık/Aylık/vb.) oraya inmenin bir anlamı yok — burada dur ve
-    // düğümün kendisini seç.
+    // (Haftalık/Aylık/vb. — standart HES ağacındaki bir "Ünite" düğümü)
+    // oraya inmenin bir anlamı yok — burada dur ve düğümün kendisini seç.
     if (mod === "ekipman" && k.alt_periyot_mu) {
       if (secilebilirMi(k)) onSecim(k);
       return;
     }
-    if (Number(k.alt_sayisi) > 0) {
-      icineGir(k);
-    } else if (secilebilirMi(k)) {
-      onSecim(k);
-    }
+    // DİĞER TÜM durumlarda tıklama HER ZAMAN içine girer — alt klasörü
+    // henüz hiç olmayan (yeni oluşturulmuş, boş) bir klasör için de aynı
+    // şekilde: aksi halde boş bir klasörün içine girip alt klasör eklemek
+    // imkansız olurdu. Doğrudan seçmek isteyen "Bunu Seç" düğmesini kullanır.
+    icineGir(k);
   }
 
   async function yeniKlasorEkle(e) {
@@ -222,9 +222,7 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
                 title={
                   mod === "ekipman" && k.alt_periyot_mu
                     ? "Bu ekipmanı seçmek için tıklayın"
-                    : Number(k.alt_sayisi) > 0
-                    ? "İçine girmek için tıklayın"
-                    : k.ad
+                    : "İçine girmek için tıklayın"
                 }
               >
                 <svg className="klasorKartIkon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
