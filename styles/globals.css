@@ -1359,3 +1359,73 @@ h1, h2, h3 {
 .donemKartiOzel {
   grid-column: 1 / -1;
 }
+
+/* ---------- Genel açılır pencere (modal) ---------- */
+.modalOrtu {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 40, 41, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  animation: modalOrtuBelir 0.15s ease;
+}
+@keyframes modalOrtuBelir {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.modalKutu {
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(9, 40, 41, 0.3);
+  animation: modalKutuBelir 0.18s ease;
+}
+@keyframes modalKutuBelir {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modalBaslikSirasi {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.modalKapatButonu {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.modalKapatButonu:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ---------- Şablon içeriği önizleme satırı ---------- */
+.sablonAdiTiklama {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s ease;
+}
+.sablonAdiTiklama:hover {
+  text-decoration-color: currentColor;
+}
