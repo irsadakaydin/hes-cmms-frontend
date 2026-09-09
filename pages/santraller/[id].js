@@ -656,7 +656,12 @@ export default function SantralDetaySayfasi() {
                 {yeniPlan.ekipman_id && ekipmanSablonlari && ekipmanSablonlari.length === 0 && (
                   <div className="kutuphaneBosUyari">
                     Bu ekipman için henüz bir bakım şablonu yok —{" "}
-                    <a href="/sablonlar">Bakım Şablonları</a> sayfasından bu ekipmanı seçerek ekleyin.
+                    <a
+                      href={`/sablonlar?santral_id=${santral.santral_id}&ekipman_id=${yeniPlan.ekipman_id}&donus=${encodeURIComponent(router.asPath)}`}
+                    >
+                      Bakım Şablonları
+                    </a>{" "}
+                    sayfasından bu ekipmanı seçerek ekleyin — şablonu kaydedince buraya geri dönebilirsiniz.
                   </div>
                 )}
               </div>
