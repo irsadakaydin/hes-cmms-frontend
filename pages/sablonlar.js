@@ -215,9 +215,18 @@ export default function SablonlarSayfasi() {
     if (santral_id && ekipman_id && !baglamdanGeldi) {
       setBaglamdanGeldi(true);
       setFormuAcik(true);
-      setTaslak((t) => ({ ...t, santral_id }));
+      // Bu santral hangi holdinge aitse (o an ekranda seçili olan holdingle
+      // aynı olmayabilir), formu ve GM ise üstteki Holding seçimini de o
+      // holdinge göre ayarlıyoruz — aksi halde Santral kutusu, yanlış
+      // holdinge göre süzüldüğü için hedef santrali hiç göstermezdi.
+      istekAt(`/api/v1/santraller/${santral_id}`)
+        .then((santral) => {
+          setTaslak((t) => ({ ...t, santral_id, isletme_id: santral.isletme_id }));
+          if (platformAdminMi) setSeciliHoldingId(santral.isletme_id);
+        })
+        .catch((err) => setHata(err.message));
     }
-  }, [router.isReady, router.query, baglamdanGeldi]);
+  }, [router.isReady, router.query, baglamdanGeldi, platformAdminMi]);
 
   // santralEkipmanlari yüklenince (yukarıdaki efekt santral_id'yi
   // ayarladıktan sonra), bağlamdan gelen ekipmanı otomatik seçiyoruz.
@@ -280,18 +289,25 @@ export default function SablonlarSayfasi() {
     else setGoruntuleUniteleri(null);
   }, [goruntuleSantralId, goruntuleUniteleriGetir]);
 
-  // Görüntüleme bölümü için erişilebilir santralleri getirir; yönetici
-  // yalnızca tek santrale tanımlıysa o santral otomatik seçilir.
+  // Görüntüleme bölümü için erişilebilir santralleri getirir. GM için
+  // önce holding seçilmesini bekler ve yalnızca o holdingin santrallerini
+  // gösterir; İşletme Admin/Santral Sorumlusu için (tek holding zaten
+  // kendi holdingleri olduğundan) doğrudan listelenir — tek santrale
+  // tanımlıysa o santral otomatik seçilir.
   useEffect(() => {
+    setGoruntuleSantraller(null);
+    setGoruntuleSantralId("");
+    if (platformAdminMi && !seciliHoldingId) return;
     istekAt("/api/v1/santraller")
       .then((veri) => {
-        setGoruntuleSantraller(veri.veri);
-        if (!platformAdminMi && veri.veri.length === 1) {
-          setGoruntuleSantralId(veri.veri[0].santral_id);
+        const filtreli = platformAdminMi ? veri.veri.filter((s) => s.isletme_id === seciliHoldingId) : veri.veri;
+        setGoruntuleSantraller(filtreli);
+        if (filtreli.length === 1) {
+          setGoruntuleSantralId(filtreli[0].santral_id);
         }
       })
       .catch((err) => setGoruntuleHata(err.message));
-  }, []);
+  }, [platformAdminMi, seciliHoldingId]);
 
   function uniteAcKapa(k) {
     setAcikUniteler((o) => ({ ...o, [k.klasor_id]: !o[k.klasor_id] }));
@@ -561,6 +577,21 @@ export default function SablonlarSayfasi() {
             />
           </div>
 
+          {platformAdminMi && (
+            <div className="alan" style={{ maxWidth: "340px" }}>
+              <label>Holding</label>
+              <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
+                <option value="">Bir holding seçin…</option>
+                {isletmeler &&
+                  isletmeler.map((h) => (
+                    <option key={h.isletme_id} value={h.isletme_id}>
+                      {h.ad}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
           {goruntuleHata && <div className="hataKutusu">{goruntuleHata}</div>}
           {hata && <div className="hataKutusu">{hata}</div>}
           {bilgi && (
@@ -583,23 +614,34 @@ export default function SablonlarSayfasi() {
           )}
 
           <div className="yonetimFormu" style={{ background: "var(--surface)" }}>
-            {goruntuleSantraller && goruntuleSantraller.length > 1 && (
-              <div className="alan" style={{ maxWidth: "340px" }}>
-                <label>Santral</label>
-                <select value={goruntuleSantralId} onChange={(e) => setGoruntuleSantralId(e.target.value)}>
-                  <option value="">Seçin…</option>
-                  {goruntuleSantraller.map((s) => (
-                    <option key={s.santral_id} value={s.santral_id}>
-                      {s.ad}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {platformAdminMi && !seciliHoldingId && (
+              <div className="bosDurum">Şablonları klasöre göre görmek için yukarıdan bir holding seçin.</div>
             )}
 
-            {!goruntuleSantraller && <div className="yukleniyor">Yükleniyor…</div>}
-            {goruntuleSantraller && goruntuleSantraller.length > 1 && !goruntuleSantralId && (
-              <div className="bosDurum">Görmek için bir santral seçin.</div>
+            {(!platformAdminMi || seciliHoldingId) && (
+              <>
+                {goruntuleSantraller && goruntuleSantraller.length > 1 && (
+                  <div className="alan" style={{ maxWidth: "340px" }}>
+                    <label>Santral</label>
+                    <select value={goruntuleSantralId} onChange={(e) => setGoruntuleSantralId(e.target.value)}>
+                      <option value="">Seçin…</option>
+                      {goruntuleSantraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {!goruntuleSantraller && <div className="yukleniyor">Yükleniyor…</div>}
+                {goruntuleSantraller && goruntuleSantraller.length === 0 && (
+                  <div className="bosDurum">Bu holdingde santral yok.</div>
+                )}
+                {goruntuleSantraller && goruntuleSantraller.length > 1 && !goruntuleSantralId && (
+                  <div className="bosDurum">Görmek için bir santral seçin.</div>
+                )}
+              </>
             )}
 
             {goruntuleSantralId && (
@@ -669,21 +711,6 @@ export default function SablonlarSayfasi() {
                 );
               })}
           </div>
-
-          {platformAdminMi && (
-            <div className="alan" style={{ maxWidth: "340px" }}>
-              <label>Holding</label>
-              <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
-                <option value="">Bir holding seçin…</option>
-                {isletmeler &&
-                  isletmeler.map((h) => (
-                    <option key={h.isletme_id} value={h.isletme_id}>
-                      {h.ad}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          )}
 
           {formuAcik && (
             <form onSubmit={sablonuKaydet} className="yonetimFormu">
