@@ -265,7 +265,7 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
         <div className="bosDurum">Bu klasörün altında başka klasör yok.</div>
       )}
 
-      {!kurulumOneriliyor && (
+      {(
         <div style={{ marginTop: "10px" }}>
           {!yeniKlasorAcik ? (
             <button type="button" className="linkButon" onClick={() => setYeniKlasorAcik(true)}>
