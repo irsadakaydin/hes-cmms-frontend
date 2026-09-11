@@ -59,7 +59,6 @@ export default function GirisSayfasi() {
       <div className="girisSayfasi">
         <div className="girisKutu">
           <div className="girisUst">
-            <span className="etiket">HES CMMS</span>
             <h1>Bakım Yönetim Sistemine Giriş</h1>
           </div>
 
