@@ -1194,8 +1194,9 @@ h1, h2, h3 {
   display: flex;
   align-items: center;
   gap: 7px;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 60%;
   background: none;
   border: none;
   cursor: pointer;
@@ -1235,7 +1236,7 @@ h1, h2, h3 {
 }
 
 .agacAd {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
@@ -1244,7 +1245,7 @@ h1, h2, h3 {
 }
 
 .agacEtiket {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--ink-soft);
   background: var(--surface);
   border-radius: 999px;
@@ -1272,9 +1273,9 @@ h1, h2, h3 {
   border: 1.5px solid var(--teal-deep);
   background: transparent;
   color: var(--teal-deep);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
   cursor: pointer;
   text-align: center;
