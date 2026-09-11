@@ -8,6 +8,11 @@ import { istekAt } from "../lib/api";
  * bir sayfaya/karta geçmez), tekrar tıklamak kapatır. Alt düğümler ilk
  * açılışta (lazy) çekilir.
  *
+ * "+ Yeni Klasör Ekle" HER ZAMAN yalnızca o an içinde bulunduğunuz EN SON
+ * (en derin açık) klasöre eklenir — bunu sağlamak için tüm ağaç, TEK bir
+ * "aktif yol" (kökten en derin açık düğüme kadar olan klasör kimlikleri
+ * dizisi) durumunu paylaşır; her seviye kendi başına açık/kapalı tutmaz.
+ *
  * mod="ekipman"  → yalnızca PERİYOT OLMAYAN düğümler seçilebilir (ekipman
  *                  buraya bağlanır, tipik olarak bir "Ünite" düzeyi).
  * mod="sablon"   → yalnızca PERİYOT YAPRAKLARI (Haftalık/Aylık/vb.)
@@ -20,6 +25,10 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
   const [kuruluyor, setKuruluyor] = useState(false);
   const [kokYeniKlasorAcik, setKokYeniKlasorAcik] = useState(false);
   const [yenilemeSayaci, setYenilemeSayaci] = useState(0);
+  // Kökten en derin açık düğüme kadar olan klasör kimlikleri — tek bir
+  // dalın açık kalmasını ve "+ Ekle"nin yalnızca en derinde çıkmasını
+  // sağlar.
+  const [aktifYol, setAktifYol] = useState([]);
 
   const kokleriGetir = useCallback(async () => {
     if (!santralId) return;
@@ -39,6 +48,7 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
   const anahtarli = `${santralId || ""}-${yenilemeSayaci}`;
   useEffect(() => {
     kokleriGetir();
+    setAktifYol([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anahtarli]);
 
@@ -104,12 +114,14 @@ export default function KlasorGezgini({ santralId, santralAdi, mod, onSecim, sec
               onSecim={onSecim}
               seciliKlasorId={seciliKlasorId}
               onDegisiklik={() => setYenilemeSayaci((n) => n + 1)}
+              aktifYol={aktifYol}
+              setAktifYol={setAktifYol}
             />
           ))}
         </div>
       )}
 
-      {(
+      {!kurulumOneriliyor && aktifYol.length === 0 && (
         <YeniKlasorSatiri
           etiket={`Bu seviyeye eklenir: ${santralAdi || "Kök"}`}
           acikMi={kokYeniKlasorAcik}
@@ -126,10 +138,10 @@ function secilebilirMi(mod, klasor) {
   return !klasor.periyot_tipi;
 }
 
-/** Ağaçtaki tek bir düğüm — kendi açık/kapalı durumunu ve (lazy) alt
- * düğümlerini yönetir; açılıp kapanması CSS ile yumuşak geçişlidir. */
-function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId, onDegisiklik }) {
-  const [acik, setAcik] = useState(false);
+/** Ağaçtaki tek bir düğüm. Açık/kapalı durumu KENDİSİNDE değil, paylaşılan
+ * "aktifYol" dizisinde tutulur — böylece her zaman yalnızca TEK bir dal
+ * açık kalır ve "+ Yeni Klasör Ekle" yalnızca o dalın en ucunda görünür. */
+function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId, onDegisiklik, aktifYol, setAktifYol }) {
   const [cocuklar, setCocuklar] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [yeniKlasorAcik, setYeniKlasorAcik] = useState(false);
@@ -137,8 +149,11 @@ function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId,
 
   const secilebilir = secilebilirMi(mod, klasor);
   const terminalMi = mod === "ekipman" && klasor.alt_periyot_mu;
+  const acik = aktifYol[seviye] === klasor.klasor_id;
+  const enDerinAcik = acik && aktifYol.length === seviye + 1;
 
   async function cocuklariGetirVeAc() {
+    setAktifYol((y) => [...y.slice(0, seviye), klasor.klasor_id]);
     if (cocuklar === null) {
       setYukleniyor(true);
       try {
@@ -150,7 +165,6 @@ function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId,
         setYukleniyor(false);
       }
     }
-    setAcik(true);
   }
 
   function satiraTiklaninca() {
@@ -162,7 +176,7 @@ function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId,
       return;
     }
     if (acik) {
-      setAcik(false);
+      setAktifYol((y) => y.slice(0, seviye));
     } else {
       cocuklariGetirVeAc();
     }
@@ -265,9 +279,11 @@ function KlasorDugumu({ klasor, seviye, santralId, mod, onSecim, seciliKlasorId,
                 onSecim={onSecim}
                 seciliKlasorId={seciliKlasorId}
                 onDegisiklik={onDegisiklik}
+                aktifYol={aktifYol}
+                setAktifYol={setAktifYol}
               />
             ))}
-          {cocuklar && (
+          {cocuklar && enDerinAcik && (
             <div style={{ paddingLeft: `${(seviye + 1) * 20}px` }}>
               <YeniKlasorSatiri
                 etiket={`Bu seviyeye eklenir: ${klasor.ad}`}
