@@ -28,7 +28,12 @@ html,
 body {
   padding: 0;
   margin: 0;
-  background: var(--paper);
+  background: linear-gradient(rgba(238, 241, 238, 0.93), rgba(238, 241, 238, 0.93)),
+    url("/gorseller/sayfa-arkaplan.webp");
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -145,8 +150,9 @@ h1, h2, h3 {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background:
-    linear-gradient(180deg, var(--teal-deep) 0%, var(--teal) 100%);
+  background: linear-gradient(rgba(9, 40, 41, 0.72), rgba(15, 61, 62, 0.72)), url("/gorseller/sayfa-arkaplan.webp");
+  background-size: cover;
+  background-position: center;
   padding: 20px;
 }
 
