@@ -103,6 +103,7 @@ export default function SablonlarSayfasi() {
   const [klasorYolu, setKlasorYolu] = useState("");
   const [sablonEkipmanId, setSablonEkipmanId] = useState("");
   const [sablonEkipmanKlasorId, setSablonEkipmanKlasorId] = useState("");
+  const [baglamMevcutSablonlar, setBaglamMevcutSablonlar] = useState(null);
   const [periyotOlusturuluyor, setPeriyotOlusturuluyor] = useState(false);
 
   // ---- Klasöre göre şablon görüntüleme (sabit yol: Elektromekanik > Turbin > Türbin) ----
@@ -249,6 +250,15 @@ export default function SablonlarSayfasi() {
   // gelindiyse — santral_id/ekipman_id/donus adresini URL'den okuyup formu
   // otomatik dolduruyoruz ve kaydedince geri dönülecek adresi saklıyoruz.
   const [donusYolu, setDonusYolu] = useState(null);
+  const [sonKaydedilenSablonId, setSonKaydedilenSablonId] = useState(null);
+
+  function donusYolunaGit(sablonIdOverride) {
+    if (!donusYolu) return;
+    const kullanilacakSablonId = sablonIdOverride || sonKaydedilenSablonId;
+    const ayrac = donusYolu.includes("?") ? "&" : "?";
+    const hedef = kullanilacakSablonId ? `${donusYolu}${ayrac}sablon_id=${kullanilacakSablonId}` : donusYolu;
+    router.push(hedef);
+  }
   const [baglamdanGeldi, setBaglamdanGeldi] = useState(false);
   useEffect(() => {
     if (!router.isReady) return;
@@ -279,6 +289,20 @@ export default function SablonlarSayfasi() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [santralEkipmanlari, baglamdanGeldi]);
+
+  // Bağlamdan (ekipman_id ile) gelindiyse ve bu ekipmanın klasöründe zaten
+  // şablon varsa, bunları "hazırdan seç" olarak gösteriyoruz — yeni bir
+  // şablon oluşturmaya gerek kalmadan mevcut olanı seçip doğrudan geri
+  // dönülebilsin diye.
+  useEffect(() => {
+    if (!baglamdanGeldi || !sablonEkipmanKlasorId) {
+      setBaglamMevcutSablonlar(null);
+      return;
+    }
+    istekAt(`/api/v1/klasorler/${sablonEkipmanKlasorId}/sablonlar-alt-agacta`)
+      .then((veri) => setBaglamMevcutSablonlar(veri.veri))
+      .catch(() => setBaglamMevcutSablonlar([]));
+  }, [baglamdanGeldi, sablonEkipmanKlasorId]);
 
   const gosterilecekSantraller = (tumSantraller || []).filter(
     (s) => s.isletme_id === (platformAdminMi ? seciliHoldingId : kendiIsletmeId)
@@ -517,6 +541,7 @@ export default function SablonlarSayfasi() {
         });
         setBilgi("Bakım şablonu kaydedildi. Karekodu aşağıda görebilirsiniz.");
         setAcikKarekodId(yeniSablon.sablon_id);
+        setSonKaydedilenSablonId(yeniSablon.sablon_id);
         setAcikGruplar((onceki) => ({
           ...onceki,
           [grupAnahtari(taslak.santral_id || null, taslak.periyot_tipi)]: true,
@@ -609,7 +634,7 @@ export default function SablonlarSayfasi() {
           {donusYolu && (
             <div className="basariliKutu" style={{ marginBottom: "14px" }}>
               Bu sayfaya, bir ekipman için şablon eklemeniz üzere yönlendirildiniz.{" "}
-              <button type="button" className="linkButon" style={{ fontWeight: 700 }} onClick={() => router.push(donusYolu)}>
+              <button type="button" className="linkButon" style={{ fontWeight: 700 }} onClick={donusYolunaGit}>
                 ◀ Şimdi geri dön
               </button>
             </div>
@@ -673,7 +698,7 @@ export default function SablonlarSayfasi() {
                     type="button"
                     className="linkButon"
                     style={{ fontWeight: 700 }}
-                    onClick={() => router.push(donusYolu)}
+                    onClick={donusYolunaGit}
                   >
                     ◀ Geldiğiniz sayfaya geri dönün
                   </button>
@@ -842,6 +867,28 @@ export default function SablonlarSayfasi() {
                     )}
                     {klasorYolu && <div className="gorevAlt" style={{ marginTop: "6px" }}>Konum: {klasorYolu}</div>}
                   </div>
+
+                  {baglamdanGeldi && baglamMevcutSablonlar && baglamMevcutSablonlar.length > 0 && (
+                    <div className="alan">
+                      <label>Bu ekipman için zaten var olan şablonlar — yeni oluşturmadan seçip geri dönebilirsiniz</label>
+                      {baglamMevcutSablonlar.map((s) => (
+                        <div className="satirKart" key={s.sablon_id}>
+                          <div>
+                            <strong>{s.ad}</strong>
+                            <span className="gorevAlt"> — {PERIYOT_ETIKETLERI[s.periyot_tipi] || s.periyot_tipi}</span>
+                          </div>
+                          <div className="kullaniciAlt">
+                            <button
+                              className="linkButon"
+                              onClick={() => donusYolunaGit(s.sablon_id)}
+                            >
+                              Bu Şablonu Kullan ve Geri Dön
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {sablonEkipmanId && (
                     <div className="alan">

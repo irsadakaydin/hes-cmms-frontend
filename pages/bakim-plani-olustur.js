@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
@@ -82,6 +82,7 @@ export default function BakimPlaniOlusturSayfasi() {
         setEkipmanlar(e.veri);
         setTumSablonlar(sb.veri);
         setAtanabilirKullanicilar(ak.veri);
+        return e.veri;
       } catch (err) {
         setHata(err.message);
       }
@@ -89,12 +90,30 @@ export default function BakimPlaniOlusturSayfasi() {
     [santraller]
   );
 
+  // Bakım Şablonları'na "bu ekipman için şablon yok" bağlantısıyla gidip
+  // geri dönüldüğünde — santral, ekipman ve (yeni oluşturulan/seçilen)
+  // şablon URL'den okunup form kaldığı yerden otomatik tamamlanır.
+  const [geriDonusdenGeldi, setGeriDonusdenGeldi] = useState(false);
+  useEffect(() => {
+    if (!router.isReady || !santraller || geriDonusdenGeldi) return;
+    const { santral_id, ekipman_id, sablon_id } = router.query;
+    if (!santral_id) return;
+    setGeriDonusdenGeldi(true);
+    (async () => {
+      const ekipmanListesi = await santralSecildi(santral_id);
+      if (ekipman_id && ekipmanListesi) {
+        await ekipmanSecildiRef.current(ekipman_id, sablon_id);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, santraller, geriDonusdenGeldi]);
+
   // Ekipman seçildiğinde: o ekipman bir klasöre bağlıysa (yeni akış), o
   // klasörün altındaki TÜM periyot yapraklarındaki şablonları getirir —
   // eşleşme kimlik (ID) bazlıdır, yazım hatası olamaz. Ekipmanın klasör
   // bağlantısı yoksa (eski kayıt), eski "Ekipman Tipi" metin eşleştirmesine
   // düşer.
-  async function ekipmanSecildi(ekipmanId) {
+  async function ekipmanSecildi(ekipmanId, oncedenSecilecekSablonId) {
     setTaslak((t) => ({ ...t, ekipman_id: ekipmanId, sablon_id: "" }));
     setEkipmanSablonlari(null);
     if (!ekipmanId) return;
@@ -103,6 +122,12 @@ export default function BakimPlaniOlusturSayfasi() {
       try {
         const veri = await istekAt(`/api/v1/klasorler/${ek.klasor_id}/sablonlar-alt-agacta`);
         setEkipmanSablonlari(veri.veri);
+        if (oncedenSecilecekSablonId) {
+          const eslesen = veri.veri.find((s) => s.sablon_id === oncedenSecilecekSablonId);
+          if (eslesen) {
+            setTaslak((t) => ({ ...t, sablon_id: eslesen.sablon_id, periyot: eslesen.periyot_tipi }));
+          }
+        }
       } catch (err) {
         setHata(err.message);
       }
@@ -112,6 +137,8 @@ export default function BakimPlaniOlusturSayfasi() {
       setEkipmanSablonlari(eslesenler);
     }
   }
+  const ekipmanSecildiRef = useRef(ekipmanSecildi);
+  ekipmanSecildiRef.current = ekipmanSecildi;
 
   function sablonSecildi(sablonId) {
     const sb = (ekipmanSablonlari || []).find((s) => s.sablon_id === sablonId);
@@ -248,7 +275,9 @@ export default function BakimPlaniOlusturSayfasi() {
                         <div className="kutuphaneBosUyari">
                           Bu ekipman için henüz bir bakım şablonu yok —{" "}
                           <a
-                            href={`/sablonlar?santral_id=${taslak.santral_id}&ekipman_id=${taslak.ekipman_id}&donus=${encodeURIComponent(router.asPath)}`}
+                            href={`/sablonlar?santral_id=${taslak.santral_id}&ekipman_id=${taslak.ekipman_id}&donus=${encodeURIComponent(
+                              `/bakim-plani-olustur?santral_id=${taslak.santral_id}&ekipman_id=${taslak.ekipman_id}`
+                            )}`}
                           >
                             Bakım Şablonları
                           </a>
