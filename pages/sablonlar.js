@@ -299,11 +299,11 @@ export default function SablonlarSayfasi() {
     setAgacHicYok(false);
     try {
       const veri = await istekAt(`/api/v1/santraller/${santralId}/unite-sablonlari`);
-      const uniteler = veri.veri.map((u) => ({ klasor_id: `unite-${u.unite_no}`, ad: u.ad }));
+      const uniteler = veri.veri.map((u) => ({ klasor_id: `unite-${u.ad}`, ad: u.ad }));
       setGoruntuleUniteleri(uniteler);
-      setUniteSablonlari(Object.fromEntries(veri.veri.map((u) => [`unite-${u.unite_no}`, u.sablonlar])));
+      setUniteSablonlari(Object.fromEntries(veri.veri.map((u) => [`unite-${u.ad}`, u.sablonlar])));
       if (uniteler.length === 0) {
-        // Hiç "Ünite N" düğümü bulunamadıysa, bu santralde klasör ağacının
+        // Bu santralde eşleşen ekipman düğümü bulunamadıysa, klasör ağacının
         // hiç kurulmamış olup olmadığını kontrol edip kurulum önerisi
         // gösteriyoruz.
         const kokVeri = await istekAt(`/api/v1/santraller/${santralId}/klasorler`);
@@ -739,7 +739,7 @@ export default function SablonlarSayfasi() {
               </div>
             )}
             {goruntuleUniteleri && goruntuleUniteleri.length === 0 && !goruntuleHata && !agacHicYok && (
-              <div className="bosDurum">Bu santralde ünite bulunamadı.</div>
+              <div className="bosDurum">Bu santralde henüz şablon bağlanabilecek bir ekipman konumu yok.</div>
             )}
 
             {goruntuleUniteleri &&
