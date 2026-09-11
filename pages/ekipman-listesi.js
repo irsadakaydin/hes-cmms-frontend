@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
-import KlasorGezgini from "../components/KlasorGezgini";
+import EkipmanKlasorAgaci from "../components/EkipmanKlasorAgaci";
 
 export default function EkipmanListesiSayfasi() {
   const router = useRouter();
@@ -223,11 +223,11 @@ export default function EkipmanListesiSayfasi() {
               <label>
                 Klasör konumu {klasorYolu && <strong>— Seçili: {klasorYolu}</strong>}
               </label>
-              <KlasorGezgini
+              <EkipmanKlasorAgaci
                 santralId={seciliSantralId}
                 santralAdi={(santraller || []).find((s) => s.santral_id === seciliSantralId)?.ad}
-                mod="ekipman"
                 onSecim={klasordekiEkipmanlariGetir}
+                seciliKlasorId={seciliKlasorId}
               />
             </div>
           )}
