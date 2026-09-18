@@ -1,4 +1,7 @@
 :root {
+  /* Sayfa arka plan resmi — GM tarafından programdan değiştirilebilir;
+     JS bu değişkeni günceller, aksi halde statik varsayılan kullanılır. */
+  --sayfa-arkaplan-resmi: url("/gorseller/sayfa-arkaplan.webp");
   /* Renk — HES/su temalı derin çamlaşım tonu + endüstriyel gösterge ambresi */
   --ink: #13201c;
   --ink-soft: #4d5c55;
@@ -29,7 +32,7 @@ body {
   padding: 0;
   margin: 0;
   background: linear-gradient(rgba(238, 241, 238, 0.93), rgba(238, 241, 238, 0.93)),
-    url("/gorseller/sayfa-arkaplan.webp");
+    var(--sayfa-arkaplan-resmi);
   background-size: cover;
   background-position: center top;
   background-attachment: fixed;
@@ -150,7 +153,7 @@ h1, h2, h3 {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: linear-gradient(rgba(9, 40, 41, 0.72), rgba(15, 61, 62, 0.72)), url("/gorseller/sayfa-arkaplan.webp");
+  background: linear-gradient(rgba(9, 40, 41, 0.72), rgba(15, 61, 62, 0.72)), var(--sayfa-arkaplan-resmi);
   background-size: cover;
   background-position: center;
   padding: 20px;
