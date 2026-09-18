@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
-import KlasorGezgini from "../components/KlasorGezgini";
+import EkipmanKlasorAgaci from "../components/EkipmanKlasorAgaci";
 
 function bosForm() {
   return { santral_id: "", ad: "", tip: "", unite_no: "", seri_no: "", uretici: "", kurulum_tarihi: "", konum_notu: "", klasor_id: "" };
@@ -131,10 +131,9 @@ export default function EkipmanOlusturSayfasi() {
                         Klasör konumu (isteğe bağlı) — bu ekipmanın klasör ağacındaki yerini seçin.
                         {klasorYolu && <strong> Seçili: {klasorYolu}</strong>}
                       </label>
-                      <KlasorGezgini
+                      <EkipmanKlasorAgaci
                         santralId={taslak.santral_id}
                         santralAdi={(gosterilecekSantraller || []).find((s) => s.santral_id === taslak.santral_id)?.ad}
-                        mod="ekipman"
                         seciliKlasorId={taslak.klasor_id}
                         onSecim={async (k) => {
                           setTaslak((t) => ({ ...t, klasor_id: k.klasor_id }));
