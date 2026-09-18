@@ -22,7 +22,8 @@ export default function EkipmanKlasorAgaci({ santralId, santralAdi, onSecim, sec
     setHata(null);
     try {
       const veri = await istekAt(`/api/v1/santraller/${santralId}/klasorler`);
-      setKokDugumler(veri.veri);
+      const filtreli = veri.veri.filter((k) => !k.periyot_tipi);
+      setKokDugumler(filtreli);
       setKurulumOneriliyor(veri.veri.length === 0);
     } catch (err) {
       setHata(err.message);
@@ -114,7 +115,7 @@ function EkipmanKlasorSatiri({ klasor, seviye, santralId, onSecim, seciliKlasorI
       setYukleniyor(true);
       try {
         const veri = await istekAt(`/api/v1/santraller/${santralId}/klasorler?ust_klasor_id=${klasor.klasor_id}`);
-        setCocuklar(veri.veri);
+        setCocuklar(veri.veri.filter((c) => !c.periyot_tipi));
       } catch (err) {
         setHata(err.message);
       } finally {
