@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { girisYap, tokenAl } from "../lib/api";
+import { girisYap, tokenAl, arkaPlaniUygula } from "../lib/api";
 
 export default function GirisSayfasi() {
   const router = useRouter();
@@ -10,6 +10,10 @@ export default function GirisSayfasi() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState(null);
   const [hesapSecimi, setHesapSecimi] = useState(null); // {isletme_id, isletme_adi}[] | null
+
+  useEffect(() => {
+    arkaPlaniUygula();
+  }, []);
 
   useEffect(() => {
     if (tokenAl()) {
