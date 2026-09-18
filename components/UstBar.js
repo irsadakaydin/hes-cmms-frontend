@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi, istekAt, tokenAl } from "../lib/api";
+import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi, istekAt, tokenAl, arkaPlaniUygula } from "../lib/api";
 import OzetBanner from "./OzetBanner";
 
 export default function UstBar() {
@@ -12,6 +12,10 @@ export default function UstBar() {
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
   const [okunmamisSayi, setOkunmamisSayi] = useState(0);
   const [ozetGorunur, setOzetGorunur] = useState(true);
+
+  useEffect(() => {
+    arkaPlaniUygula();
+  }, []);
 
   useEffect(() => {
     if (!tokenAl()) return;
@@ -49,6 +53,7 @@ export default function UstBar() {
               {okunmamisSayi > 0 && <span className="okunmamisIsareti">✉</span>}
             </Link>
             {platformAdmin && <Link href="/holdingler">Holdingler</Link>}
+            {platformAdmin && <Link href="/sistem-ayarlari">Sistem Ayarları</Link>}
             {yonetici && <Link href="/santraller">Santraller</Link>}
             {yonetici && <Link href="/ekipman-listesi">Ekipman Listesi</Link>}
             {yonetici && <Link href="/ekipman-olustur">Ekipman Oluştur</Link>}
