@@ -55,6 +55,7 @@ export default function UstBar() {
             {platformAdmin && <Link href="/holdingler">Holdingler</Link>}
             {platformAdmin && <Link href="/sistem-ayarlari">Sistem Ayarları</Link>}
             {yonetici && <Link href="/santraller">Santraller</Link>}
+            <Link href="/depo">Depo</Link>
             {yonetici && <Link href="/ekipman-listesi">Ekipman Listesi</Link>}
             {yonetici && <Link href="/ekipman-olustur">Ekipman Oluştur</Link>}
             {yonetici && <Link href="/bakimlar">Bakımlar</Link>}
