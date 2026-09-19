@@ -181,7 +181,15 @@ export default function BakimlarSayfasi() {
 
   const planlarBuSekmede = (planlar || []).filter((p) => p.kategori === sekme);
   const sayilar = KATEGORI_SEKMELERI.reduce((acc, s) => {
-    acc[s.deger] = (planlar || []).filter((p) => p.kategori === s.deger).length;
+    // "Tamamlanan" sekmesi PLAN değil GÖREV listesi gösteriyor (aşağıda
+    // tamamlananGorevler ile), bu yüzden etiketteki sayı da o listenin
+    // uzunluğundan alınmalı — plan bazlı sayım kullanılırsa (bir plan,
+    // sürekli tekrarlandığı için nadiren "tamamen bitmiş" sayılır) etiket
+    // her zaman 0 gösterirdi, listede gerçek kayıtlar görünse bile.
+    acc[s.deger] =
+      s.deger === "TAMAMLANAN"
+        ? (tamamlananGorevler || []).length
+        : (planlar || []).filter((p) => p.kategori === s.deger).length;
     return acc;
   }, {});
 
