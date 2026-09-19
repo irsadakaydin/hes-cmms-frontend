@@ -4,19 +4,25 @@ import Head from "next/head";
 import { istekAt, tokenAl, kullaniciAl, yoneticiMi, platformAdminMi, dosyaIndir } from "../lib/api";
 import UstBar from "../components/UstBar";
 
-const SEKMELER = [
-  { deger: "LISTE", etiket: "Depo Malzeme Listesi" },
-  { deger: "GIRIS", etiket: "Malzeme Giriş" },
-  { deger: "CIKIS", etiket: "Malzeme Çıkış" },
-  { deger: "RAPOR", etiket: "Rapor PDF Al" },
-];
-
 export default function DepoSayfasi() {
   const router = useRouter();
   const kullanici = typeof window !== "undefined" ? kullaniciAl() : null;
-  const yonetici = typeof window !== "undefined" ? yoneticiMi() : false; // Santral Sorumlusu ve üstü
+  const yonetici = typeof window !== "undefined" ? yoneticiMi() : false; // Santral Sorumlusu ve üstü — onaycılar
   const platformAdmin = typeof window !== "undefined" ? platformAdminMi() : false;
   const sahaVeUstu = !!kullanici && kullanici.rol !== "IZLEYICI"; // Malzeme Çıkış talebi edebilenler
+
+  const SEKMELER = [
+    { deger: "LISTE", etiket: "Depo Malzeme Listesi" },
+    { deger: "GIRIS", etiket: "Malzeme Giriş" },
+    { deger: "CIKIS", etiket: "Malzeme Çıkış" },
+    ...(yonetici
+      ? [
+          { deger: "CIKIS_ONAY", etiket: "Malzeme Çıkış Onay" },
+          { deger: "CIKIS_RED", etiket: "Malzeme Çıkış Red" },
+        ]
+      : [{ deger: "BEKLEYEN_ONAYLAR", etiket: "Bekleyen Onaylar" }]),
+    { deger: "RAPOR", etiket: "Rapor PDF Al" },
+  ];
 
   const [santraller, setSantraller] = useState(null);
   const [holdingler, setHoldingler] = useState(null);
@@ -100,7 +106,7 @@ export default function DepoSayfasi() {
 
           {seciliSantralId && (
             <>
-              <div className="sekmeSirasi" style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+              <div className="sekmeSirasi" style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
                 {SEKMELER.map((s) => (
                   <button
                     key={s.deger}
@@ -120,21 +126,17 @@ export default function DepoSayfasi() {
 
               {sekme === "LISTE" && <MalzemeListesi santralId={seciliSantralId} />}
               {sekme === "GIRIS" && (
-                <MalzemeGiris
-                  santralId={seciliSantralId}
-                  yonetici={yonetici}
-                  setHata={setHata}
-                  setBilgi={setBilgi}
-                />
+                <MalzemeGiris santralId={seciliSantralId} yonetici={yonetici} setHata={setHata} setBilgi={setBilgi} />
               )}
               {sekme === "CIKIS" && (
-                <MalzemeCikis
-                  santralId={seciliSantralId}
-                  yonetici={yonetici}
-                  sahaVeUstu={sahaVeUstu}
-                  setHata={setHata}
-                  setBilgi={setBilgi}
-                />
+                <MalzemeCikis santralId={seciliSantralId} sahaVeUstu={sahaVeUstu} setHata={setHata} setBilgi={setBilgi} />
+              )}
+              {sekme === "CIKIS_ONAY" && yonetici && (
+                <CikisOnay santralId={seciliSantralId} setHata={setHata} setBilgi={setBilgi} />
+              )}
+              {sekme === "CIKIS_RED" && yonetici && <CikisRed santralId={seciliSantralId} setHata={setHata} />}
+              {sekme === "BEKLEYEN_ONAYLAR" && !yonetici && (
+                <BekleyenOnaylar santralId={seciliSantralId} kullaniciId={kullanici?.kullanici_id} setHata={setHata} />
               )}
               {sekme === "RAPOR" && <RaporPdfAl santralId={seciliSantralId} setHata={setHata} />}
             </>
@@ -314,25 +316,23 @@ function MalzemeGiris({ santralId, yonetici, setHata, setBilgi }) {
 }
 
 // ---------------------------------------------------------------------
-function MalzemeCikis({ santralId, yonetici, sahaVeUstu, setHata, setBilgi }) {
+// Yalnızca YENİ ÇIKIŞ TALEBİ oluşturma formu — onaylama/reddetme ayrı
+// sekmelere taşındı (Malzeme Çıkış Onay / Bekleyen Onaylar).
+function MalzemeCikis({ santralId, sahaVeUstu, setHata, setBilgi }) {
   const [malzemeler, setMalzemeler] = useState(null);
-  const [talepler, setTalepler] = useState(null);
   const [malzemeId, setMalzemeId] = useState("");
   const [miktar, setMiktar] = useState("");
   const [gonderiliyor, setGonderiliyor] = useState(false);
 
-  const yenile = useCallback(() => {
+  useEffect(() => {
     istekAt(`/api/v1/santraller/${santralId}/depo/malzemeler`)
       .then((v) => setMalzemeler(v.veri))
       .catch((err) => setHata(err.message));
-    istekAt(`/api/v1/santraller/${santralId}/depo/cikis`)
-      .then((v) => setTalepler(v.veri))
-      .catch((err) => setHata(err.message));
   }, [santralId, setHata]);
 
-  useEffect(() => {
-    yenile();
-  }, [yenile]);
+  if (!sahaVeUstu) {
+    return <div className="bosDurum">Çıkış talebi oluşturma yetkiniz yok.</div>;
+  }
 
   async function talepGonder(e) {
     e.preventDefault();
@@ -344,10 +344,9 @@ function MalzemeCikis({ santralId, yonetici, sahaVeUstu, setHata, setBilgi }) {
         method: "POST",
         body: JSON.stringify({ malzeme_id: malzemeId, miktar: Number(miktar) }),
       });
-      setBilgi("Çıkış talebi oluşturuldu — Santral Sorumlusu/İşletme Admin onayı bekleniyor.");
+      setBilgi("Çıkış talebi oluşturuldu — Santral Sorumlusu/İşletme Admin onayı bekleniyor. Durumu \"Bekleyen Onaylar\" sekmesinden takip edebilirsiniz.");
       setMalzemeId("");
       setMiktar("");
-      yenile();
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -355,8 +354,53 @@ function MalzemeCikis({ santralId, yonetici, sahaVeUstu, setHata, setBilgi }) {
     }
   }
 
+  return (
+    <form onSubmit={talepGonder} className="yonetimFormu">
+      <h3 style={{ marginTop: 0 }}>Yeni Çıkış Talebi</h3>
+      <div className="alan">
+        <label>Malzeme</label>
+        <select required value={malzemeId} onChange={(e) => setMalzemeId(e.target.value)}>
+          <option value="">Seçin…</option>
+          {(malzemeler || []).map((m) => (
+            <option key={m.malzeme_id} value={m.malzeme_id}>
+              {m.ad} (SKU: {m.sku}) — mevcut: {m.mevcut_miktar} {m.birim}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="alan">
+        <label>Miktar</label>
+        <input required type="number" step="any" min="0.001" value={miktar} onChange={(e) => setMiktar(e.target.value)} />
+      </div>
+      <button className="birincilButon" type="submit" disabled={gonderiliyor}>
+        {gonderiliyor ? "Gönderiliyor…" : "Çıkış Talebi Gönder"}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------
+// MALZEME ÇIKIŞ ONAY — yalnızca onaycılar (Santral Sorumlusu ve üstü)
+// görür. Bekleyen TÜM talepleri listeler, her birinin yanında Onayla/
+// Reddet var.
+function CikisOnay({ santralId, setHata, setBilgi }) {
+  const [talepler, setTalepler] = useState(null);
+  const [redAcikId, setRedAcikId] = useState(null);
+  const [redNotu, setRedNotu] = useState("");
+
+  const yenile = useCallback(() => {
+    istekAt(`/api/v1/santraller/${santralId}/depo/cikis?durum=BEKLIYOR`)
+      .then((v) => setTalepler(v.veri))
+      .catch((err) => setHata(err.message));
+  }, [santralId, setHata]);
+
+  useEffect(() => {
+    yenile();
+  }, [yenile]);
+
   async function onayla(cikisId) {
     setHata(null);
+    setBilgi(null);
     try {
       await istekAt(`/api/v1/santraller/${santralId}/depo/cikis/${cikisId}/onayla`, { method: "POST" });
       setBilgi("Çıkış onaylandı ve stoktan düşüldü.");
@@ -367,91 +411,138 @@ function MalzemeCikis({ santralId, yonetici, sahaVeUstu, setHata, setBilgi }) {
   }
 
   async function reddet(cikisId) {
-    const not = prompt("Ret nedeni (isteğe bağlı):") || "";
     setHata(null);
+    setBilgi(null);
     try {
       await istekAt(`/api/v1/santraller/${santralId}/depo/cikis/${cikisId}/reddet`, {
         method: "POST",
-        body: JSON.stringify({ red_notu: not }),
+        body: JSON.stringify({ red_notu: redNotu }),
       });
-      setBilgi("Çıkış talebi reddedildi.");
+      setBilgi("Çıkış talebi reddedildi — talep eden kullanıcıya bildirim gönderildi.");
+      setRedAcikId(null);
+      setRedNotu("");
       yenile();
     } catch (err) {
       setHata(err.message);
     }
   }
 
-  const DURUM_ETIKETLERI = { BEKLIYOR: "Bekliyor", ONAYLANDI: "Onaylandı", REDDEDILDI: "Reddedildi" };
-
   return (
-    <>
-      {sahaVeUstu && (
-        <form onSubmit={talepGonder} className="yonetimFormu">
-          <h3 style={{ marginTop: 0 }}>Yeni Çıkış Talebi</h3>
-          <div className="alan">
-            <label>Malzeme</label>
-            <select required value={malzemeId} onChange={(e) => setMalzemeId(e.target.value)}>
-              <option value="">Seçin…</option>
-              {(malzemeler || []).map((m) => (
-                <option key={m.malzeme_id} value={m.malzeme_id}>
-                  {m.ad} (SKU: {m.sku}) — mevcut: {m.mevcut_miktar} {m.birim}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="alan">
-            <label>Miktar</label>
-            <input required type="number" step="any" min="0.001" value={miktar} onChange={(e) => setMiktar(e.target.value)} />
-          </div>
-          <button className="birincilButon" type="submit" disabled={gonderiliyor}>
-            {gonderiliyor ? "Gönderiliyor…" : "Çıkış Talebi Gönder"}
-          </button>
-        </form>
-      )}
-
-      <div className="yonetimFormu">
-        <h3 style={{ marginTop: 0 }}>{yonetici ? "Tüm Çıkış Talepleri" : "Taleplerim"}</h3>
-        {!talepler && <div className="yukleniyor">Yükleniyor…</div>}
-        {talepler && talepler.length === 0 && <div className="bosDurum">Henüz çıkış talebi yok.</div>}
-        {talepler &&
-          talepler.map((t) => (
-            <div className="satirKart" key={t.cikis_id}>
-              <div>
-                <strong>{t.malzeme_adi}</strong> — {t.miktar} {t.birim}
-                <span
-                  style={{
-                    marginLeft: 8,
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    padding: "2px 8px",
-                    borderRadius: "999px",
-                    background: t.durum === "ONAYLANDI" ? "#2f6d3e" : t.durum === "REDDEDILDI" ? "#a83b2e" : "#c17a24",
-                    color: "#fff",
+    <div className="yonetimFormu">
+      <h3 style={{ marginTop: 0 }}>Bekleyen Çıkış Talepleri</h3>
+      {!talepler && <div className="yukleniyor">Yükleniyor…</div>}
+      {talepler && talepler.length === 0 && <div className="bosDurum">Bekleyen çıkış talebi yok.</div>}
+      {talepler &&
+        talepler.map((t) => (
+          <div className="satirKart" key={t.cikis_id}>
+            <div>
+              <strong>{t.malzeme_adi}</strong> — {t.miktar} {t.birim}
+            </div>
+            <div className="gorevAlt">
+              Talep eden: {t.talep_eden_adi} · {new Date(t.talep_tarihi).toLocaleString("tr-TR")}
+            </div>
+            <div className="kullaniciAlt" style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "6px" }}>
+              <button className="birincilButon" style={{ width: "auto" }} onClick={() => onayla(t.cikis_id)}>
+                ✓ Onayla
+              </button>
+              {redAcikId === t.cikis_id ? (
+                <>
+                  <input
+                    placeholder="Ret nedeni (isteğe bağlı)"
+                    value={redNotu}
+                    onChange={(e) => setRedNotu(e.target.value)}
+                    style={{ flex: 1, maxWidth: "260px" }}
+                  />
+                  <button className="linkButon" onClick={() => reddet(t.cikis_id)}>
+                    Reddi Onayla
+                  </button>
+                  <button className="linkButon" onClick={() => setRedAcikId(null)}>
+                    Vazgeç
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="kucukButon"
+                  style={{ background: "#a83b2e", width: "auto" }}
+                  onClick={() => {
+                    setRedAcikId(t.cikis_id);
+                    setRedNotu("");
                   }}
                 >
-                  {DURUM_ETIKETLERI[t.durum]}
-                </span>
-              </div>
-              <div className="gorevAlt">
-                Talep eden: {t.talep_eden_adi} · {new Date(t.talep_tarihi).toLocaleString("tr-TR")}
-                {t.fis_no && ` · Fiş No: ${t.fis_no}`}
-                {t.onaylayan_adi && ` · İşlemi yapan: ${t.onaylayan_adi}`}
-                {t.red_notu && ` · Not: ${t.red_notu}`}
-              </div>
-              {yonetici && t.durum === "BEKLIYOR" && (
-                <div className="kullaniciAlt">
-                  <button className="linkButon" onClick={() => onayla(t.cikis_id)}>
-                    Onayla
-                  </button>
-                  <button className="linkButon" onClick={() => reddet(t.cikis_id)}>
-                    Reddet
-                  </button>
-                </div>
+                  ✕ Reddet
+                </button>
               )}
             </div>
-          ))}
-      </div>
-    </>
+          </div>
+        ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// MALZEME ÇIKIŞ RED — yalnızca onaycılar görür; yalnızca REDDEDİLMİŞ
+// talepleri (geçmiş) gösterir.
+function CikisRed({ santralId, setHata }) {
+  const [talepler, setTalepler] = useState(null);
+
+  useEffect(() => {
+    istekAt(`/api/v1/santraller/${santralId}/depo/cikis?durum=REDDEDILDI`)
+      .then((v) => setTalepler(v.veri))
+      .catch((err) => setHata(err.message));
+  }, [santralId, setHata]);
+
+  return (
+    <div className="yonetimFormu">
+      <h3 style={{ marginTop: 0 }}>Reddedilen Çıkış Talepleri</h3>
+      {!talepler && <div className="yukleniyor">Yükleniyor…</div>}
+      {talepler && talepler.length === 0 && <div className="bosDurum">Reddedilen talep yok.</div>}
+      {talepler &&
+        talepler.map((t) => (
+          <div className="satirKart" key={t.cikis_id}>
+            <div>
+              <strong>{t.malzeme_adi}</strong> — {t.miktar} {t.birim}
+            </div>
+            <div className="gorevAlt">
+              Talep eden: {t.talep_eden_adi} · Reddeden: {t.onaylayan_adi || "—"} ·{" "}
+              {new Date(t.talep_tarihi).toLocaleString("tr-TR")}
+              {t.red_notu && ` · Not: ${t.red_notu}`}
+            </div>
+          </div>
+        ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// BEKLEYEN ONAYLAR — onaycı OLMAYAN kullanıcılar için: kendi gönderdikleri,
+// henüz onaylanmamış (BEKLIYOR) talepleri gösterir.
+function BekleyenOnaylar({ santralId, kullaniciId, setHata }) {
+  const [talepler, setTalepler] = useState(null);
+
+  useEffect(() => {
+    istekAt(`/api/v1/santraller/${santralId}/depo/cikis?durum=BEKLIYOR`)
+      .then((v) => setTalepler(v.veri.filter((t) => t.talep_eden_kullanici_id === kullaniciId)))
+      .catch((err) => setHata(err.message));
+  }, [santralId, kullaniciId, setHata]);
+
+  return (
+    <div className="yonetimFormu">
+      <h3 style={{ marginTop: 0 }}>Bekleyen Onaylar</h3>
+      {!talepler && <div className="yukleniyor">Yükleniyor…</div>}
+      {talepler && talepler.length === 0 && <div className="bosDurum">Onay bekleyen talebiniz yok.</div>}
+      {talepler &&
+        talepler.map((t) => (
+          <div className="satirKart" key={t.cikis_id}>
+            <div>
+              <strong>{t.malzeme_adi}</strong> — {t.miktar} {t.birim}
+            </div>
+            <div className="gorevAlt">
+              {new Date(t.talep_tarihi).toLocaleString("tr-TR")} · Onay bekliyor
+            </div>
+          </div>
+        ))}
+    </div>
   );
 }
 
