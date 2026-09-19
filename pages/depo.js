@@ -212,19 +212,33 @@ function MalzemeKarekod({ malzeme }) {
   const url =
     typeof window !== "undefined" ? `${window.location.origin}/depo-karekod/${malzeme.malzeme_id}` : "";
   const karekodResmi = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
+  const [indiriliyor, setIndiriliyor] = useState(false);
+  const [hata, setHata] = useState(null);
+
+  async function pdfIndir() {
+    setHata(null);
+    setIndiriliyor(true);
+    try {
+      const p = new URLSearchParams({ hedef_url: url });
+      await dosyaIndir(
+        `/api/v1/depo/malzemeler/${malzeme.malzeme_id}/karekod-pdf?${p.toString()}`,
+        `karekod-${malzeme.sku}.pdf`
+      );
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setIndiriliyor(false);
+    }
+  }
 
   return (
     <div style={{ marginTop: "10px", padding: "12px", background: "var(--paper)", borderRadius: "10px" }}>
+      {hata && <div className="hataKutusu">{hata}</div>}
       <img src={karekodResmi} alt={`${malzeme.ad} karekodu`} width={180} height={180} />
       <div style={{ marginTop: "8px", display: "flex", gap: "10px" }}>
-        <a
-          href={karekodResmi}
-          download={`karekod-${malzeme.sku}.png`}
-          className="linkButon"
-          style={{ textDecoration: "none" }}
-        >
-          ⬇ Karekodu İndir
-        </a>
+        <button type="button" className="linkButon" onClick={pdfIndir} disabled={indiriliyor}>
+          {indiriliyor ? "Hazırlanıyor…" : "⬇ Karekodu PDF Olarak İndir"}
+        </button>
       </div>
       <div className="gorevAlt" style={{ marginTop: "6px" }}>
         Bu karekodu okutan kullanıcı, oturum açıksa doğrudan bu malzeme için çıkış talebi oluşturabilir.
