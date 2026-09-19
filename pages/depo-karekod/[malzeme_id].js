@@ -36,6 +36,10 @@ export default function DepoKarekodSayfasi() {
     e.preventDefault();
     setHata(null);
     setBilgi(null);
+    if (Number(malzeme.mevcut_miktar) < Number(miktar)) {
+      setHata("Depoda talep ettiğiniz miktarda malzeme bulunmamaktadır.");
+      return;
+    }
     setGonderiliyor(true);
     try {
       await istekAt(`/api/v1/santraller/${malzeme.santral_id}/depo/cikis-talep`, {
