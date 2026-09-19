@@ -17,8 +17,8 @@ export default function DepoSayfasi() {
     { deger: "CIKIS", etiket: "Malzeme Çıkış" },
     ...(yonetici
       ? [
-          { deger: "CIKIS_ONAY", etiket: "Malzeme Çıkış Onay" },
-          { deger: "CIKIS_RED", etiket: "Malzeme Çıkış Red" },
+          { deger: "CIKIS_ONAY", etiket: "Bekleyen Malzeme Çıkış Onayları" },
+          { deger: "CIKIS_RED", etiket: "Red Edilen Malzeme Çıkışları" },
         ]
       : [{ deger: "BEKLEYEN_ONAYLAR", etiket: "Bekleyen Onaylar" }]),
     { deger: "RAPOR", etiket: "Rapor PDF Al" },
