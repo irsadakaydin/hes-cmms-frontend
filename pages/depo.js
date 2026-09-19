@@ -419,6 +419,11 @@ function MalzemeCikis({ santralId, sahaVeUstu, setHata, setBilgi }) {
     e.preventDefault();
     setHata(null);
     setBilgi(null);
+    const secilenMalzeme = (malzemeler || []).find((m) => m.malzeme_id === malzemeId);
+    if (secilenMalzeme && Number(secilenMalzeme.mevcut_miktar) < Number(miktar)) {
+      setHata("Depoda talep ettiğiniz miktarda malzeme bulunmamaktadır.");
+      return;
+    }
     setGonderiliyor(true);
     try {
       await istekAt(`/api/v1/santraller/${santralId}/depo/cikis-talep`, {
