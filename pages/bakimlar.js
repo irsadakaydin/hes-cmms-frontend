@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { istekAt, tokenAl, yoneticiMi, platformAdminMi, isletmeYoneticisiMi } from "../lib/api";
+import { istekAt, tokenAl, yoneticiMi, platformAdminMi, isletmeYoneticisiMi, dosyaIndir } from "../lib/api";
 import UstBar from "../components/UstBar";
 
 const PERIYOT_ETIKETLERI = {
@@ -89,6 +89,9 @@ export default function BakimlarSayfasi() {
   const [acikPeriyotGrubu, setAcikPeriyotGrubu] = useState(null);
   const [seciliYil, setSeciliYil] = useState({});
   const [seciliAltDonem, setSeciliAltDonem] = useState({});
+  const [zipBaslangic, setZipBaslangic] = useState("");
+  const [zipBitis, setZipBitis] = useState("");
+  const [zipIndiriliyor, setZipIndiriliyor] = useState(false);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -312,6 +315,48 @@ export default function BakimlarSayfasi() {
 
               {sekme === "TAMAMLANAN" && (
                 <>
+                  <div className="yonetimFormu" style={{ marginBottom: "16px" }}>
+                    <h3 style={{ marginTop: 0 }}>Toplu İndir (ZIP)</h3>
+                    <p className="gorevAlt" style={{ marginBottom: "10px" }}>
+                      Seçilen tarih aralığındaki tüm tamamlanmış bakım formlarını (her biri ayrı bir PDF olarak)
+                      tek bir ZIP dosyasında indirin.
+                    </p>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                      <div className="alan" style={{ marginBottom: 0 }}>
+                        <label>Başlangıç Tarihi</label>
+                        <input type="date" value={zipBaslangic} onChange={(e) => setZipBaslangic(e.target.value)} />
+                      </div>
+                      <div className="alan" style={{ marginBottom: 0 }}>
+                        <label>Bitiş Tarihi</label>
+                        <input type="date" value={zipBitis} onChange={(e) => setZipBitis(e.target.value)} />
+                      </div>
+                      <button
+                        className="birincilButon"
+                        style={{ width: "auto" }}
+                        disabled={zipIndiriliyor}
+                        onClick={async () => {
+                          setZipIndiriliyor(true);
+                          setHata(null);
+                          try {
+                            const p = new URLSearchParams({ santral_id: seciliSantralId });
+                            if (zipBaslangic) p.set("baslangic", zipBaslangic);
+                            if (zipBitis) p.set("bitis", zipBitis);
+                            await dosyaIndir(
+                              `/api/v1/raporlar/tamamlanan-gorevler/zip?${p.toString()}`,
+                              "tamamlanan-bakimlar.zip"
+                            );
+                          } catch (err) {
+                            setHata(err.message);
+                          } finally {
+                            setZipIndiriliyor(false);
+                          }
+                        }}
+                      >
+                        {zipIndiriliyor ? "Hazırlanıyor… (çok kayıt varsa biraz sürebilir)" : "ZIP Olarak İndir"}
+                      </button>
+                    </div>
+                  </div>
+
                   {!tamamlananGorevler && <div className="yukleniyor">Yükleniyor…</div>}
                   {tamamlananGorevler && tamamlananGorevler.length === 0 && (
                     <div className="bosDurum">Bu santral için tamamlanmış bir bakım kaydı yok.</div>
