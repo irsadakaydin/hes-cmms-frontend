@@ -200,6 +200,7 @@ function MalzemeGiris({ santralId, yonetici, setHata, setBilgi }) {
   const [form, setForm] = useState(bosForm);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [gecmis, setGecmis] = useState(null);
+  const [malzemeler, setMalzemeler] = useState(null);
 
   const gecmisiGetir = useCallback(() => {
     istekAt(`/api/v1/santraller/${santralId}/depo/giris`)
@@ -209,7 +210,30 @@ function MalzemeGiris({ santralId, yonetici, setHata, setBilgi }) {
 
   useEffect(() => {
     gecmisiGetir();
-  }, [gecmisiGetir]);
+    istekAt(`/api/v1/santraller/${santralId}/depo/malzemeler`)
+      .then((v) => setMalzemeler(v.veri))
+      .catch((err) => setHata(err.message));
+  }, [gecmisiGetir, santralId, setHata]);
+
+  // SKU kutusuna daha önce girilmiş bir malzemenin kodu yazılınca/seçilince
+  // Miktar HARİÇ diğer tüm alanları o malzemenin son bilgileriyle otomatik
+  // doldurur — aynı malzemeyi tekrar tekrar elle girmeye gerek kalmasın.
+  function skuDegisti(deger) {
+    const eslesen = (malzemeler || []).find((m) => m.sku === deger);
+    if (eslesen) {
+      setForm((f) => ({
+        ...f,
+        sku: deger,
+        ad: eslesen.ad,
+        barkod: eslesen.barkod || "",
+        birim: eslesen.birim,
+        kritik_stok_miktari: eslesen.kritik_stok_miktari ?? "",
+        konum: eslesen.konum || "",
+      }));
+    } else {
+      setForm((f) => ({ ...f, sku: deger }));
+    }
+  }
 
   if (!yonetici) {
     return (
@@ -236,6 +260,9 @@ function MalzemeGiris({ santralId, yonetici, setHata, setBilgi }) {
       setBilgi(`Malzeme girişi kaydedildi — Fiş No: ${sonuc.giris.fis_no}`);
       setForm(bosForm);
       gecmisiGetir();
+      istekAt(`/api/v1/santraller/${santralId}/depo/malzemeler`)
+        .then((v) => setMalzemeler(v.veri))
+        .catch(() => {});
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -248,7 +275,21 @@ function MalzemeGiris({ santralId, yonetici, setHata, setBilgi }) {
       <form onSubmit={gonder} className="yonetimFormu">
         <div className="alan">
           <label>Malzeme Kodu (SKU)</label>
-          <input required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+          <input
+            required
+            list="depo-malzeme-oneri"
+            value={form.sku}
+            onChange={(e) => skuDegisti(e.target.value)}
+            autoComplete="off"
+            placeholder="Tıklayınca daha önce girilmiş malzemeler önerilir"
+          />
+          <datalist id="depo-malzeme-oneri">
+            {(malzemeler || []).map((m) => (
+              <option key={m.malzeme_id} value={m.sku}>
+                {m.ad}
+              </option>
+            ))}
+          </datalist>
         </div>
         <div className="alan">
           <label>Malzeme Adı / Açıklaması</label>
