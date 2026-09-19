@@ -151,6 +151,7 @@ export default function DepoSayfasi() {
 function MalzemeListesi({ santralId }) {
   const [malzemeler, setMalzemeler] = useState(null);
   const [hata, setHata] = useState(null);
+  const [acikKarekodId, setAcikKarekodId] = useState(null);
 
   useEffect(() => {
     setMalzemeler(null);
@@ -187,9 +188,47 @@ function MalzemeListesi({ santralId }) {
                 {m.konum && ` · Konum: ${m.konum}`}
                 {m.barkod && ` · Barkod: ${m.barkod}`}
               </div>
+              <div className="kullaniciAlt">
+                <button
+                  className="linkButon"
+                  onClick={() => setAcikKarekodId(acikKarekodId === m.malzeme_id ? null : m.malzeme_id)}
+                >
+                  {acikKarekodId === m.malzeme_id ? "Karekodu Gizle" : "Karekod Oluştur"}
+                </button>
+              </div>
+              {acikKarekodId === m.malzeme_id && <MalzemeKarekod malzeme={m} />}
             </div>
           );
         })}
+    </div>
+  );
+}
+
+/** Bir malzemenin karekodunu gösterir ve indirilebilir hale getirir.
+ * Karekod, bu malzemenin çıkış-talep sayfasının bağlantısını taşır —
+ * herhangi bir kullanıcı telefonuyla okutup doğrudan çıkış talebi
+ * oluşturabilir. */
+function MalzemeKarekod({ malzeme }) {
+  const url =
+    typeof window !== "undefined" ? `${window.location.origin}/depo-karekod/${malzeme.malzeme_id}` : "";
+  const karekodResmi = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
+
+  return (
+    <div style={{ marginTop: "10px", padding: "12px", background: "var(--paper)", borderRadius: "10px" }}>
+      <img src={karekodResmi} alt={`${malzeme.ad} karekodu`} width={180} height={180} />
+      <div style={{ marginTop: "8px", display: "flex", gap: "10px" }}>
+        <a
+          href={karekodResmi}
+          download={`karekod-${malzeme.sku}.png`}
+          className="linkButon"
+          style={{ textDecoration: "none" }}
+        >
+          ⬇ Karekodu İndir
+        </a>
+      </div>
+      <div className="gorevAlt" style={{ marginTop: "6px" }}>
+        Bu karekodu okutan kullanıcı, oturum açıksa doğrudan bu malzeme için çıkış talebi oluşturabilir.
+      </div>
     </div>
   );
 }
@@ -363,6 +402,7 @@ function MalzemeCikis({ santralId, sahaVeUstu, setHata, setBilgi }) {
   const [malzemeler, setMalzemeler] = useState(null);
   const [malzemeId, setMalzemeId] = useState("");
   const [miktar, setMiktar] = useState("");
+  const [kullanimYeri, setKullanimYeri] = useState("");
   const [gonderiliyor, setGonderiliyor] = useState(false);
 
   useEffect(() => {
@@ -383,11 +423,12 @@ function MalzemeCikis({ santralId, sahaVeUstu, setHata, setBilgi }) {
     try {
       await istekAt(`/api/v1/santraller/${santralId}/depo/cikis-talep`, {
         method: "POST",
-        body: JSON.stringify({ malzeme_id: malzemeId, miktar: Number(miktar) }),
+        body: JSON.stringify({ malzeme_id: malzemeId, miktar: Number(miktar), kullanim_yeri: kullanimYeri || null }),
       });
       setBilgi("Çıkış talebi oluşturuldu — Santral Sorumlusu/İşletme Admin onayı bekleniyor. Durumu \"Bekleyen Onaylar\" sekmesinden takip edebilirsiniz.");
       setMalzemeId("");
       setMiktar("");
+      setKullanimYeri("");
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -412,6 +453,14 @@ function MalzemeCikis({ santralId, sahaVeUstu, setHata, setBilgi }) {
       <div className="alan">
         <label>Miktar</label>
         <input required type="number" step="any" min="0.001" value={miktar} onChange={(e) => setMiktar(e.target.value)} />
+      </div>
+      <div className="alan">
+        <label>Malzemenin Kullanım Yeri</label>
+        <input
+          value={kullanimYeri}
+          onChange={(e) => setKullanimYeri(e.target.value)}
+          placeholder="Ör. Ünite 2 Türbin Yatağı, Şalt Sahası…"
+        />
       </div>
       <button className="birincilButon" type="submit" disabled={gonderiliyor}>
         {gonderiliyor ? "Gönderiliyor…" : "Çıkış Talebi Gönder"}
@@ -481,6 +530,7 @@ function CikisOnay({ santralId, setHata, setBilgi }) {
             </div>
             <div className="gorevAlt">
               Talep eden: {t.talep_eden_adi} · {new Date(t.talep_tarihi).toLocaleString("tr-TR")}
+              {t.kullanim_yeri && ` · Kullanım yeri: ${t.kullanim_yeri}`}
             </div>
             <div className="kullaniciAlt" style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "6px" }}>
               <button className="birincilButon" style={{ width: "auto" }} onClick={() => onayla(t.cikis_id)}>
@@ -547,6 +597,7 @@ function CikisRed({ santralId, setHata }) {
             <div className="gorevAlt">
               Talep eden: {t.talep_eden_adi} · Reddeden: {t.onaylayan_adi || "—"} ·{" "}
               {new Date(t.talep_tarihi).toLocaleString("tr-TR")}
+              {t.kullanim_yeri && ` · Kullanım yeri: ${t.kullanim_yeri}`}
               {t.red_notu && ` · Not: ${t.red_notu}`}
             </div>
           </div>
@@ -580,6 +631,7 @@ function BekleyenOnaylar({ santralId, kullaniciId, setHata }) {
             </div>
             <div className="gorevAlt">
               {new Date(t.talep_tarihi).toLocaleString("tr-TR")} · Onay bekliyor
+              {t.kullanim_yeri && ` · Kullanım yeri: ${t.kullanim_yeri}`}
             </div>
           </div>
         ))}
