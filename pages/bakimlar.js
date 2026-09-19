@@ -80,7 +80,9 @@ export default function BakimlarSayfasi() {
   const [holdingler, setHoldingler] = useState(null);
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
   const [seciliSantralId, setSeciliSantralId] = useState("");
-  const [planlar, setPlanlar] = useState(null);
+  const [planlar, setPlanlar] = useState(null); // yalnızca Durdurulan sekmesi için (plan bazlı kalıyor)
+  const [devamEdenGorevler, setDevamEdenGorevler] = useState(null);
+  const [gecikenGorevler, setGecikenGorevler] = useState(null);
   const [sekme, setSekme] = useState("DEVAM_EDEN");
   const [baslangic, setBaslangic] = useState("");
   const [bitis, setBitis] = useState("");
@@ -122,6 +124,8 @@ export default function BakimlarSayfasi() {
     if (router.query.sekme) setSekme(router.query.sekme);
   }, [router.isReady, router.query.santral_id, router.query.sekme]);
 
+  // "Durdurulan" sekmesi hâlâ PLAN listesi gösterir (durdurulmuş/pasif
+  // planların kendisi listelenir — görev instance'ı değil).
   const planlariGetir = useCallback(async () => {
     setHata(null);
     if (!seciliSantralId) {
@@ -143,6 +147,26 @@ export default function BakimlarSayfasi() {
     planlariGetir();
   }, [planlariGetir]);
 
+  // Devam Eden / Geciken — artık GÖREV seviyesinde, banner'daki (Özet
+  // Banner) sayımla BİREBİR aynı kaynaktan (durum bazlı) besleniyor. Tarih
+  // aralığından kasıtlı olarak bağımsızdır — banner'daki bu iki kategori
+  // de döneme bağlı değildir.
+  useEffect(() => {
+    if (!seciliSantralId) {
+      setDevamEdenGorevler(null);
+      setGecikenGorevler(null);
+      return;
+    }
+    setDevamEdenGorevler(null);
+    setGecikenGorevler(null);
+    istekAt(`/api/v1/raporlar/gorevler-durum?santral_id=${seciliSantralId}&durum=BEKLIYOR`)
+      .then((v) => setDevamEdenGorevler(v.veri))
+      .catch((err) => setHata(err.message));
+    istekAt(`/api/v1/raporlar/gorevler-durum?santral_id=${seciliSantralId}&durum=GECIKTI`)
+      .then((v) => setGecikenGorevler(v.veri))
+      .catch((err) => setHata(err.message));
+  }, [seciliSantralId]);
+
   // "Tamamlanan Bakımlar" sekmesi açıldığında, o santralin TÜM tamamlanmış
   // görev geçmişini (tarih sınırı olmadan) çekip periyot/yıl/alt-döneme göre
   // gruplamak için kullanıyoruz.
@@ -160,11 +184,26 @@ export default function BakimlarSayfasi() {
 
   const cokSantralliMi = (santraller || []).length > 1;
 
+  async function gorevListeleriniYenile() {
+    if (!seciliSantralId) return;
+    try {
+      const [d, g] = await Promise.all([
+        istekAt(`/api/v1/raporlar/gorevler-durum?santral_id=${seciliSantralId}&durum=BEKLIYOR`),
+        istekAt(`/api/v1/raporlar/gorevler-durum?santral_id=${seciliSantralId}&durum=GECIKTI`),
+      ]);
+      setDevamEdenGorevler(d.veri);
+      setGecikenGorevler(g.veri);
+    } catch (err) {
+      setHata(err.message);
+    }
+  }
+
   async function planiDurdur(planId) {
     if (!confirm("Bu bakım planını durdurmak istediğinize emin misiniz?")) return;
     try {
       await istekAt(`/api/v1/bakim-planlari/${planId}/durdur`, { method: "POST" });
       await planlariGetir();
+      await gorevListeleriniYenile();
     } catch (err) {
       setHata(err.message);
     }
@@ -174,24 +213,50 @@ export default function BakimlarSayfasi() {
     try {
       await istekAt(`/api/v1/bakim-planlari/${planId}/aktiflestir`, { method: "POST" });
       await planlariGetir();
+      await gorevListeleriniYenile();
     } catch (err) {
       setHata(err.message);
     }
   }
 
-  const planlarBuSekmede = (planlar || []).filter((p) => p.kategori === sekme);
-  const sayilar = KATEGORI_SEKMELERI.reduce((acc, s) => {
-    // "Tamamlanan" sekmesi PLAN değil GÖREV listesi gösteriyor (aşağıda
-    // tamamlananGorevler ile), bu yüzden etiketteki sayı da o listenin
-    // uzunluğundan alınmalı — plan bazlı sayım kullanılırsa (bir plan,
-    // sürekli tekrarlandığı için nadiren "tamamen bitmiş" sayılır) etiket
-    // her zaman 0 gösterirdi, listede gerçek kayıtlar görünse bile.
-    acc[s.deger] =
-      s.deger === "TAMAMLANAN"
-        ? (tamamlananGorevler || []).length
-        : (planlar || []).filter((p) => p.kategori === s.deger).length;
-    return acc;
-  }, {});
+  const planlarBuSekmede = sekme === "DURDURULAN" ? (planlar || []).filter((p) => p.kategori === "DURDURULAN") : [];
+
+  // Sayılar artık Özet Banner ile BİREBİR AYNI kaynaktan (görev bazlı)
+  // geliyor — Durdurulan tek istisna, çünkü o doğası gereği PLAN sayısıdır.
+  const sayilar = {
+    DEVAM_EDEN: (devamEdenGorevler || []).length,
+    GECIKEN: (gecikenGorevler || []).length,
+    TAMAMLANAN: (tamamlananGorevler || []).length,
+    DURDURULAN: (planlar || []).filter((p) => p.kategori === "DURDURULAN").length,
+  };
+
+  function GorevSatiri({ g }) {
+    return (
+      <div className="satirKart" key={g.gorev_id}>
+        <div>
+          <strong>{g.ekipman_adi}</strong> — {g.bakim_adi}
+        </div>
+        <div className="gorevAlt">
+          {PERIYOT_ETIKETLERI[g.periyot] || g.periyot} · Planlanan tarih:{" "}
+          {new Date(g.planlanan_tarih).toLocaleDateString("tr-TR")} · Atanan: {g.atanan_personel}
+          {!g.aktif_mi && " · (plan durdurulmuş)"}
+        </div>
+        {g.sorumlular && g.sorumlular.length > 0 && (
+          <div className="gorevAlt">Sorumlular: {g.sorumlular.map((s) => s.ad_soyad).join(", ")}</div>
+        )}
+        {duzenleyebilirMi && g.aktif_mi && (
+          <div className="kullaniciAlt">
+            <Link href={`/santraller/${seciliSantralId}`} className="linkButon">
+              Düzenle
+            </Link>
+            <button className="linkButon" onClick={() => planiDurdur(g.plan_id)}>
+              Planı durdur
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -246,11 +311,11 @@ export default function BakimlarSayfasi() {
 
             <div style={{ display: "flex", gap: "12px" }}>
               <div className="alan" style={{ flex: 1 }}>
-                <label>Başlangıç tarihi (isteğe bağlı)</label>
+                <label>Başlangıç tarihi (yalnızca "Durdurulan" listesini etkiler)</label>
                 <input type="date" value={baslangic} onChange={(e) => setBaslangic(e.target.value)} />
               </div>
               <div className="alan" style={{ flex: 1 }}>
-                <label>Bitiş tarihi (isteğe bağlı)</label>
+                <label>Bitiş tarihi (yalnızca "Durdurulan" listesini etkiler)</label>
                 <input type="date" value={bitis} onChange={(e) => setBitis(e.target.value)} />
               </div>
             </div>
@@ -278,13 +343,36 @@ export default function BakimlarSayfasi() {
                 ))}
               </div>
 
-              {sekme !== "TAMAMLANAN" && (
+              {sekme === "DEVAM_EDEN" && (
+                <>
+                  {!devamEdenGorevler && <div className="yukleniyor">Yükleniyor…</div>}
+                  {devamEdenGorevler && devamEdenGorevler.length === 0 && (
+                    <div className="bosDurum">Bekleyen bakım yok.</div>
+                  )}
+                  {(devamEdenGorevler || []).map((g) => (
+                    <GorevSatiri g={g} key={g.gorev_id} />
+                  ))}
+                </>
+              )}
+
+              {sekme === "GECIKEN" && (
+                <>
+                  {!gecikenGorevler && <div className="yukleniyor">Yükleniyor…</div>}
+                  {gecikenGorevler && gecikenGorevler.length === 0 && (
+                    <div className="bosDurum">Geciken bakım yok.</div>
+                  )}
+                  {(gecikenGorevler || []).map((g) => (
+                    <GorevSatiri g={g} key={g.gorev_id} />
+                  ))}
+                </>
+              )}
+
+              {sekme === "DURDURULAN" && (
                 <>
                   {!planlar && <div className="yukleniyor">Yükleniyor…</div>}
                   {planlar && planlarBuSekmede.length === 0 && (
-                    <div className="bosDurum">Bu kategoride görüntülenecek bakım yok.</div>
+                    <div className="bosDurum">Durdurulmuş bakım planı yok.</div>
                   )}
-
                   {planlarBuSekmede.map((p) => (
                     <div className="satirKart" key={p.plan_id}>
                       <div>
@@ -294,22 +382,11 @@ export default function BakimlarSayfasi() {
                         {PERIYOT_ETIKETLERI[p.periyot] || p.periyot}
                         {p.son_donem_tarihi &&
                           ` · Son dönem: ${new Date(p.son_donem_tarihi).toLocaleDateString("tr-TR")}`}
-                        {p.son_donem_toplam > 0 && ` · ${p.son_donem_tamamlanan}/${p.son_donem_toplam} kişi onayladı`}
                       </div>
                       {p.sorumlular && p.sorumlular.length > 0 && (
                         <div className="gorevAlt">Sorumlular: {p.sorumlular.map((s) => s.ad_soyad).join(", ")}</div>
                       )}
-                      {duzenleyebilirMi && (sekme === "DEVAM_EDEN" || sekme === "GECIKEN") && (
-                        <div className="kullaniciAlt">
-                          <Link href={`/santraller/${seciliSantralId}`} className="linkButon">
-                            Düzenle
-                          </Link>
-                          <button className="linkButon" onClick={() => planiDurdur(p.plan_id)}>
-                            Planı durdur
-                          </button>
-                        </div>
-                      )}
-                      {duzenleyebilirMi && sekme === "DURDURULAN" && (
+                      {duzenleyebilirMi && (
                         <div className="kullaniciAlt">
                           <button className="linkButon" onClick={() => planiAktiflestir(p.plan_id)}>
                             Yeniden aktifleştir
