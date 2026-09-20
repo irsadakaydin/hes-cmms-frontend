@@ -10,6 +10,7 @@ export default function GirisSayfasi() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState(null);
   const [hesapSecimi, setHesapSecimi] = useState(null); // {isletme_id, isletme_adi}[] | null
+  const [oturumCakismasi, setOturumCakismasi] = useState(false); // başka cihazda açık oturum uyarısı
 
   useEffect(() => {
     arkaPlaniUygula();
@@ -21,15 +22,16 @@ export default function GirisSayfasi() {
     }
   }, [router, router.query.sonra]);
 
-  async function girisiTamamla(isletme_id) {
+  async function girisiTamamla(isletme_id, oturumu_sonlandir) {
     setHata(null);
     setYukleniyor(true);
     try {
-      await girisYap(eposta, sifre, isletme_id);
+      await girisYap(eposta, sifre, isletme_id, oturumu_sonlandir);
       router.push(router.query.sonra ? decodeURIComponent(router.query.sonra) : "/gorevler");
     } catch (err) {
       setHata(err.message || "Giriş yapılamadı.");
       setHesapSecimi(null);
+      setOturumCakismasi(false);
     } finally {
       setYukleniyor(false);
     }
@@ -47,6 +49,10 @@ export default function GirisSayfasi() {
       // yapılacağını sorup seçilenle tekrar dener.
       if (err.hata_kodu === "BIRDEN_FAZLA_HESAP" && err.detay?.hesaplar) {
         setHesapSecimi(err.detay.hesaplar);
+      } else if (err.hata_kodu === "BASKA_OTURUM_VAR") {
+        // Bu hesapla başka bir cihazda zaten oturum açık — kullanıcıya
+        // onu sonlandırıp devam etme seçeneği sunuluyor.
+        setOturumCakismasi(true);
       } else {
         setHata(err.message || "Giriş yapılamadı.");
       }
@@ -58,7 +64,7 @@ export default function GirisSayfasi() {
   return (
     <>
       <Head>
-        <title>Giriş — HES Bakım Yönetim Sistemi</title>
+        <title>Giriş — Bakım Yönetim Sistemi</title>
       </Head>
       <div className="girisSayfasi">
         <div className="girisKutu">
@@ -68,7 +74,26 @@ export default function GirisSayfasi() {
 
           {hata && <div className="hataKutusu">{hata}</div>}
 
-          {hesapSecimi ? (
+          {oturumCakismasi ? (
+            <div>
+              <p className="gorevAlt" style={{ marginBottom: "14px" }}>
+                Bu hesapla başka bir cihazda zaten oturum açık. Devam etmek isterseniz o oturum sonlandırılıp
+                buradan giriş yapılacaktır.
+              </p>
+              <button
+                type="button"
+                className="birincilButon"
+                style={{ marginBottom: "8px" }}
+                disabled={yukleniyor}
+                onClick={() => girisiTamamla(undefined, true)}
+              >
+                {yukleniyor ? "Giriş yapılıyor…" : "Diğer Oturumu Sonlandır ve Giriş Yap"}
+              </button>
+              <button type="button" className="linkButon" onClick={() => setOturumCakismasi(false)}>
+                ← Vazgeç
+              </button>
+            </div>
+          ) : hesapSecimi ? (
             <div>
               <p className="gorevAlt" style={{ marginBottom: "10px" }}>
                 Bu e-posta birden fazla holdingde kayıtlı. Giriş yapmak istediğiniz holdingi seçin:
