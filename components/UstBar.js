@@ -34,8 +34,8 @@ export default function UstBar() {
     });
   }
 
-  function cikis() {
-    cikisYap();
+  async function cikis() {
+    await cikisYap();
     router.push("/");
   }
 
