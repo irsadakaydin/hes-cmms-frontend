@@ -12,6 +12,8 @@ export default function SistemAyarlariSayfasi() {
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [hata, setHata] = useState(null);
   const [bilgi, setBilgi] = useState(null);
+  const [zamanlayiciAktif, setZamanlayiciAktif] = useState(null);
+  const [zamanlayiciDegisiyor, setZamanlayiciDegisiyor] = useState(false);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -25,7 +27,32 @@ export default function SistemAyarlariSayfasi() {
     istekAt("/api/v1/sistem-ayarlari/arkaplan")
       .then((veri) => setMevcutResim(veri.arkaplan_resmi))
       .catch((err) => setHata(err.message));
+    istekAt("/api/v1/sistem-ayarlari/zamanlayici")
+      .then((veri) => setZamanlayiciAktif(veri.aktif_mi))
+      .catch((err) => setHata(err.message));
   }, [router]);
+
+  async function zamanlayiciDegistir(yeniDurum) {
+    setZamanlayiciDegisiyor(true);
+    setHata(null);
+    setBilgi(null);
+    try {
+      await istekAt("/api/v1/sistem-ayarlari/zamanlayici", {
+        method: "PATCH",
+        body: JSON.stringify({ aktif_mi: yeniDurum }),
+      });
+      setZamanlayiciAktif(yeniDurum);
+      setBilgi(
+        yeniDurum
+          ? "Zamanlayıcı aktifleştirildi — bir sonraki günlük çalışmada görevler normal şekilde üretilecek."
+          : "Zamanlayıcı pasifleştirildi — bir sonraki günlük çalışma hiçbir işlem yapmadan geçecek (yeni görev üretilmeyecek, hatırlatma/gecikme bildirimi gönderilmeyecek)."
+      );
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setZamanlayiciDegisiyor(false);
+    }
+  }
 
   function dosyaSecildi(e) {
     const dosya = e.target.files?.[0];
@@ -146,6 +173,50 @@ export default function SistemAyarlariSayfasi() {
                 </button>
               )}
             </div>
+          </div>
+
+          <div className="yonetimFormu">
+            <h3 style={{ marginTop: 0 }}>Otomatik Görev Zamanlayıcısı</h3>
+            <p className="gorevAlt" style={{ marginBottom: "14px" }}>
+              Sistem her gün otomatik olarak yeni bakım görevleri üretir, yaklaşan görevler için hatırlatma
+              gönderir ve süresi geçen görevleri "Gecikti" olarak işaretler. Bunu geçici olarak durdurmak
+              isterseniz aşağıdan kapatabilirsiniz.
+            </p>
+            {zamanlayiciAktif === null ? (
+              <div className="yukleniyor">Yükleniyor…</div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: zamanlayiciAktif ? "#2c7a4b" : "#a83b2e",
+                  }}
+                >
+                  {zamanlayiciAktif ? "● Aktif" : "● Pasif"}
+                </span>
+                {zamanlayiciAktif ? (
+                  <button
+                    type="button"
+                    className="kucukButon"
+                    style={{ background: "#a83b2e" }}
+                    onClick={() => zamanlayiciDegistir(false)}
+                    disabled={zamanlayiciDegisiyor}
+                  >
+                    {zamanlayiciDegisiyor ? "Değiştiriliyor…" : "Zamanlayıcıyı Pasifleştir"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="birincilButon"
+                    style={{ width: "auto" }}
+                    onClick={() => zamanlayiciDegistir(true)}
+                    disabled={zamanlayiciDegisiyor}
+                  >
+                    {zamanlayiciDegisiyor ? "Değiştiriliyor…" : "Zamanlayıcıyı Aktifleştir"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
