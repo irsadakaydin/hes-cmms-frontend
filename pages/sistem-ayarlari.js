@@ -14,6 +14,8 @@ export default function SistemAyarlariSayfasi() {
   const [bilgi, setBilgi] = useState(null);
   const [zamanlayiciAktif, setZamanlayiciAktif] = useState(null);
   const [zamanlayiciDegisiyor, setZamanlayiciDegisiyor] = useState(false);
+  const [holdingler, setHoldingler] = useState(null);
+  const [seciliHoldingId, setSeciliHoldingId] = useState("");
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -27,25 +29,37 @@ export default function SistemAyarlariSayfasi() {
     istekAt("/api/v1/sistem-ayarlari/arkaplan")
       .then((veri) => setMevcutResim(veri.arkaplan_resmi))
       .catch((err) => setHata(err.message));
-    istekAt("/api/v1/sistem-ayarlari/zamanlayici")
-      .then((veri) => setZamanlayiciAktif(veri.aktif_mi))
+    istekAt("/api/v1/isletmeler")
+      .then((veri) => setHoldingler(veri.veri))
       .catch((err) => setHata(err.message));
   }, [router]);
+
+  // Holding seçilince, o holdingin zamanlayıcı durumunu ayrıca çek.
+  useEffect(() => {
+    if (!seciliHoldingId) {
+      setZamanlayiciAktif(null);
+      return;
+    }
+    setZamanlayiciAktif(null);
+    istekAt(`/api/v1/sistem-ayarlari/zamanlayici/${seciliHoldingId}`)
+      .then((veri) => setZamanlayiciAktif(veri.aktif_mi))
+      .catch((err) => setHata(err.message));
+  }, [seciliHoldingId]);
 
   async function zamanlayiciDegistir(yeniDurum) {
     setZamanlayiciDegisiyor(true);
     setHata(null);
     setBilgi(null);
     try {
-      await istekAt("/api/v1/sistem-ayarlari/zamanlayici", {
+      await istekAt(`/api/v1/sistem-ayarlari/zamanlayici/${seciliHoldingId}`, {
         method: "PATCH",
         body: JSON.stringify({ aktif_mi: yeniDurum }),
       });
       setZamanlayiciAktif(yeniDurum);
       setBilgi(
         yeniDurum
-          ? "Zamanlayıcı aktifleştirildi — bir sonraki günlük çalışmada görevler normal şekilde üretilecek."
-          : "Zamanlayıcı pasifleştirildi — bir sonraki günlük çalışma hiçbir işlem yapmadan geçecek (yeni görev üretilmeyecek, hatırlatma/gecikme bildirimi gönderilmeyecek)."
+          ? "Zamanlayıcı bu holding için aktifleştirildi — bir sonraki günlük çalışmada bu holdingin görevleri normal şekilde üretilecek."
+          : "Zamanlayıcı bu holding için pasifleştirildi — bir sonraki günlük çalışmada bu holdingin planları atlanacak (diğer holdingler etkilenmez)."
       );
     } catch (err) {
       setHata(err.message);
@@ -179,12 +193,28 @@ export default function SistemAyarlariSayfasi() {
             <h3 style={{ marginTop: 0 }}>Otomatik Görev Zamanlayıcısı</h3>
             <p className="gorevAlt" style={{ marginBottom: "14px" }}>
               Sistem her gün otomatik olarak yeni bakım görevleri üretir, yaklaşan görevler için hatırlatma
-              gönderir ve süresi geçen görevleri "Gecikti" olarak işaretler. Bunu geçici olarak durdurmak
-              isterseniz aşağıdan kapatabilirsiniz.
+              gönderir ve süresi geçen görevleri "Gecikti" olarak işaretler. Bu, her HOLDİNG için ayrı ayrı
+              açılıp kapatılabilir — önce bir holding seçin.
             </p>
-            {zamanlayiciAktif === null ? (
-              <div className="yukleniyor">Yükleniyor…</div>
-            ) : (
+
+            <div className="alan" style={{ maxWidth: "340px" }}>
+              <label>Holding</label>
+              <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
+                <option value="">Bir holding seçin…</option>
+                {holdingler &&
+                  holdingler.map((h) => (
+                    <option key={h.isletme_id} value={h.isletme_id}>
+                      {h.ad}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {!seciliHoldingId && (
+              <div className="bosDurum">Zamanlayıcı durumunu görmek için önce bir holding seçin.</div>
+            )}
+            {seciliHoldingId && zamanlayiciAktif === null && <div className="yukleniyor">Yükleniyor…</div>}
+            {seciliHoldingId && zamanlayiciAktif !== null && (
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <span
                   style={{
