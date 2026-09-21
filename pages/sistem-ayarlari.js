@@ -16,6 +16,8 @@ export default function SistemAyarlariSayfasi() {
   const [zamanlayiciDegisiyor, setZamanlayiciDegisiyor] = useState(false);
   const [holdingler, setHoldingler] = useState(null);
   const [seciliHoldingId, setSeciliHoldingId] = useState("");
+  const [santraller, setSantraller] = useState(null);
+  const [seciliSantralId, setSeciliSantralId] = useState("");
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -34,32 +36,42 @@ export default function SistemAyarlariSayfasi() {
       .catch((err) => setHata(err.message));
   }, [router]);
 
-  // Holding seçilince, o holdingin zamanlayıcı durumunu ayrıca çek.
+  // Holding seçilince o holdingin santrallerini çek.
   useEffect(() => {
-    if (!seciliHoldingId) {
+    setSeciliSantralId("");
+    setSantraller(null);
+    if (!seciliHoldingId) return;
+    istekAt("/api/v1/santraller")
+      .then((veri) => setSantraller(veri.veri.filter((s) => s.isletme_id === seciliHoldingId)))
+      .catch((err) => setHata(err.message));
+  }, [seciliHoldingId]);
+
+  // Santral seçilince, o santralin zamanlayıcı durumunu ayrıca çek.
+  useEffect(() => {
+    if (!seciliSantralId) {
       setZamanlayiciAktif(null);
       return;
     }
     setZamanlayiciAktif(null);
-    istekAt(`/api/v1/sistem-ayarlari/zamanlayici/${seciliHoldingId}`)
+    istekAt(`/api/v1/sistem-ayarlari/zamanlayici/${seciliSantralId}`)
       .then((veri) => setZamanlayiciAktif(veri.aktif_mi))
       .catch((err) => setHata(err.message));
-  }, [seciliHoldingId]);
+  }, [seciliSantralId]);
 
   async function zamanlayiciDegistir(yeniDurum) {
     setZamanlayiciDegisiyor(true);
     setHata(null);
     setBilgi(null);
     try {
-      await istekAt(`/api/v1/sistem-ayarlari/zamanlayici/${seciliHoldingId}`, {
+      await istekAt(`/api/v1/sistem-ayarlari/zamanlayici/${seciliSantralId}`, {
         method: "PATCH",
         body: JSON.stringify({ aktif_mi: yeniDurum }),
       });
       setZamanlayiciAktif(yeniDurum);
       setBilgi(
         yeniDurum
-          ? "Zamanlayıcı bu holding için aktifleştirildi — bir sonraki günlük çalışmada bu holdingin görevleri normal şekilde üretilecek."
-          : "Zamanlayıcı bu holding için pasifleştirildi — bir sonraki günlük çalışmada bu holdingin planları atlanacak (diğer holdingler etkilenmez)."
+          ? "Zamanlayıcı bu santral için aktifleştirildi — bir sonraki günlük çalışmada bu santralin görevleri normal şekilde üretilecek."
+          : "Zamanlayıcı bu santral için pasifleştirildi — bir sonraki günlük çalışmada bu santralin planları atlanacak (aynı holdingin diğer santralleri etkilenmez)."
       );
     } catch (err) {
       setHata(err.message);
@@ -193,28 +205,44 @@ export default function SistemAyarlariSayfasi() {
             <h3 style={{ marginTop: 0 }}>Otomatik Görev Zamanlayıcısı</h3>
             <p className="gorevAlt" style={{ marginBottom: "14px" }}>
               Sistem her gün otomatik olarak yeni bakım görevleri üretir, yaklaşan görevler için hatırlatma
-              gönderir ve süresi geçen görevleri "Gecikti" olarak işaretler. Bu, her HOLDİNG için ayrı ayrı
-              açılıp kapatılabilir — önce bir holding seçin.
+              gönderir ve süresi geçen görevleri "Gecikti" olarak işaretler. Bu, her SANTRAL için ayrı ayrı
+              açılıp kapatılabilir — önce holding, sonra santral seçin.
             </p>
 
-            <div className="alan" style={{ maxWidth: "340px" }}>
-              <label>Holding</label>
-              <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
-                <option value="">Bir holding seçin…</option>
-                {holdingler &&
-                  holdingler.map((h) => (
-                    <option key={h.isletme_id} value={h.isletme_id}>
-                      {h.ad}
-                    </option>
-                  ))}
-              </select>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <div className="alan" style={{ maxWidth: "300px", flex: 1 }}>
+                <label>Holding</label>
+                <select value={seciliHoldingId} onChange={(e) => setSeciliHoldingId(e.target.value)}>
+                  <option value="">Bir holding seçin…</option>
+                  {holdingler &&
+                    holdingler.map((h) => (
+                      <option key={h.isletme_id} value={h.isletme_id}>
+                        {h.ad}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {seciliHoldingId && (
+                <div className="alan" style={{ maxWidth: "300px", flex: 1 }}>
+                  <label>Santral</label>
+                  <select value={seciliSantralId} onChange={(e) => setSeciliSantralId(e.target.value)}>
+                    <option value="">Bir santral seçin…</option>
+                    {santraller &&
+                      santraller.map((s) => (
+                        <option key={s.santral_id} value={s.santral_id}>
+                          {s.ad}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-            {!seciliHoldingId && (
-              <div className="bosDurum">Zamanlayıcı durumunu görmek için önce bir holding seçin.</div>
+            {!seciliSantralId && (
+              <div className="bosDurum">Zamanlayıcı durumunu görmek için holding ve santral seçin.</div>
             )}
-            {seciliHoldingId && zamanlayiciAktif === null && <div className="yukleniyor">Yükleniyor…</div>}
-            {seciliHoldingId && zamanlayiciAktif !== null && (
+            {seciliSantralId && zamanlayiciAktif === null && <div className="yukleniyor">Yükleniyor…</div>}
+            {seciliSantralId && zamanlayiciAktif !== null && (
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <span
                   style={{
