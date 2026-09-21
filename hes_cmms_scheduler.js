@@ -115,11 +115,18 @@ async function generateUpcomingTasks(client) {
   const ufuk = new Date();
   ufuk.setDate(ufuk.getDate() + URETIM_UFKU_GUN);
 
+  // Yalnızca kendi HOLDİNGİNİN zamanlayıcısı aktif olan planlar işlenir —
+  // bir holding kendi otomatik görev üretimini durdurmuşsa (isletme.
+  // zamanlayici_aktif = FALSE), o holdingin planları burada atlanır,
+  // diğer holdingler normal şekilde devam eder.
   const { rows: planlar } = await client.query(`
-    SELECT plan_id, santral_id, periyot, baslangic_tarihi, bitis_tarihi
-    FROM bakim_plani
-    WHERE aktif_mi = TRUE
-      AND (bitis_tarihi IS NULL OR bitis_tarihi >= CURRENT_DATE)
+    SELECT bp.plan_id, bp.santral_id, bp.periyot, bp.baslangic_tarihi, bp.bitis_tarihi
+    FROM bakim_plani bp
+    JOIN santral s ON s.santral_id = bp.santral_id
+    JOIN isletme i ON i.isletme_id = s.isletme_id
+    WHERE bp.aktif_mi = TRUE
+      AND i.zamanlayici_aktif = TRUE
+      AND (bp.bitis_tarihi IS NULL OR bp.bitis_tarihi >= CURRENT_DATE)
   `);
 
   let uretilenSayisi = 0;
@@ -176,8 +183,10 @@ async function sendReminders(client) {
     JOIN kullanici k        ON k.kullanici_id = g.atanan_kullanici_id
     JOIN bakim_plani bp     ON bp.plan_id = g.plan_id
     JOIN santral s          ON s.santral_id = bp.santral_id
+    JOIN isletme i          ON i.isletme_id = s.isletme_id
     JOIN bakim_sablonu bs   ON bs.sablon_id = bp.sablon_id
     WHERE g.durum = 'BEKLIYOR'
+      AND i.zamanlayici_aktif = TRUE
       AND g.planlanan_tarih <= CURRENT_DATE + $1::int
       AND g.son_bildirim_tarihi IS NULL
     `,
@@ -227,7 +236,10 @@ async function markOverdueAndEscalate(client) {
            bp.periyot, bp.bitis_tarihi
     FROM bakim_gorevi g
     JOIN bakim_plani bp ON bp.plan_id = g.plan_id
+    JOIN santral s      ON s.santral_id = bp.santral_id
+    JOIN isletme i      ON i.isletme_id = s.isletme_id
     WHERE g.durum = 'BEKLIYOR'
+      AND i.zamanlayici_aktif = TRUE
   `);
 
   const bugun = new Date(new Date().toDateString());
@@ -299,18 +311,8 @@ async function markOverdueAndEscalate(client) {
 async function run() {
   const client = await pool.connect();
   try {
-    // Sistem Ayarları'ndan (GM'in aç/kapat düğmesi) zamanlayıcının aktif
-    // olup olmadığını kontrol et — PASİF ise hiçbir işlem yapmadan çık.
-    const { rows: ayarRows } = await client.query(
-      `SELECT deger FROM sistem_ayarlari WHERE anahtar = 'zamanlayici_aktif'`
-    );
-    const aktifMi = ayarRows[0] ? ayarRows[0].deger !== "false" : true;
-    if (!aktifMi) {
-      console.log(`\n=== HES CMMS Zamanlayıcı — ${new Date().toISOString()} — PASİF (Sistem Ayarları'ndan kapatılmış), çalıştırılmadı ===\n`);
-      return;
-    }
-
     console.log(`\n=== HES CMMS Zamanlayıcı — ${new Date().toISOString()} ===`);
+    console.log("(Not: Her holding kendi zamanlayici_aktif bayrağına göre ayrı ayrı işlenir — pasif holdingler atlanır.)");
     await generateUpcomingTasks(client);
     await sendReminders(client);
     await markOverdueAndEscalate(client);
