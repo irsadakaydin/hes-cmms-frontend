@@ -135,6 +135,7 @@ export default function EkipmanOlusturSayfasi() {
                         santralId={taslak.santral_id}
                         santralAdi={(gosterilecekSantraller || []).find((s) => s.santral_id === taslak.santral_id)?.ad}
                         seciliKlasorId={taslak.klasor_id}
+                        klasorEklenebilir
                         onSecim={async (k) => {
                           setTaslak((t) => ({ ...t, klasor_id: k.klasor_id }));
                           try {
