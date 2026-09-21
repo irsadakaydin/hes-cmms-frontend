@@ -54,6 +54,10 @@ export default function DepoSayfasi() {
     ? (santraller || []).filter((s) => s.isletme_id === seciliHoldingId)
     : santraller;
 
+  // Gösterilecek TEK bir santral varsa (ör. holdingin tek santrali) santral
+  // kutusu yerine adı yazılır ve o santral otomatik seçilir.
+  const tekSantral = gosterilecekSantraller && gosterilecekSantraller.length === 1 ? gosterilecekSantraller[0] : null;
+
   return (
     <>
       <Head>
@@ -75,8 +79,12 @@ export default function DepoSayfasi() {
               <select
                 value={seciliHoldingId}
                 onChange={(e) => {
-                  setSeciliHoldingId(e.target.value);
-                  setSeciliSantralId("");
+                  const yeniHoldingId = e.target.value;
+                  setSeciliHoldingId(yeniHoldingId);
+                  // Seçilen holdingin TEK santrali varsa doğrudan onu seç
+                  // (santral kutusu yalnızca birden fazla santralde çıkar).
+                  const holdingSantralleri = (santraller || []).filter((s) => s.isletme_id === yeniHoldingId);
+                  setSeciliSantralId(holdingSantralleri.length === 1 ? holdingSantralleri[0].santral_id : "");
                 }}
               >
                 <option value="">Bir holding seçin…</option>
@@ -101,6 +109,13 @@ export default function DepoSayfasi() {
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {(!platformAdmin || seciliHoldingId) && tekSantral && (
+            <div className="alan" style={{ maxWidth: "340px" }}>
+              <label>Santral</label>
+              <div className="gorevAlt">{tekSantral.ad}</div>
             </div>
           )}
 
