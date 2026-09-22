@@ -139,7 +139,7 @@ export default function DepoSayfasi() {
                 ))}
               </div>
 
-              {sekme === "LISTE" && <MalzemeListesi santralId={seciliSantralId} />}
+              {sekme === "LISTE" && <MalzemeListesi santralId={seciliSantralId} yonetici={yonetici} />}
               {sekme === "GIRIS" && (
                 <MalzemeGiris santralId={seciliSantralId} yonetici={yonetici} setHata={setHata} setBilgi={setBilgi} />
               )}
@@ -163,21 +163,28 @@ export default function DepoSayfasi() {
 }
 
 // ---------------------------------------------------------------------
-function MalzemeListesi({ santralId }) {
+function MalzemeListesi({ santralId, yonetici }) {
   const [malzemeler, setMalzemeler] = useState(null);
   const [hata, setHata] = useState(null);
   const [acikKarekodId, setAcikKarekodId] = useState(null);
+  const [acikGirisId, setAcikGirisId] = useState(null);
+  const [basariMesaji, setBasariMesaji] = useState(null);
 
-  useEffect(() => {
-    setMalzemeler(null);
+  const listeyiYenile = useCallback(() => {
     istekAt(`/api/v1/santraller/${santralId}/depo/malzemeler`)
       .then((v) => setMalzemeler(v.veri))
       .catch((err) => setHata(err.message));
   }, [santralId]);
 
+  useEffect(() => {
+    setMalzemeler(null);
+    listeyiYenile();
+  }, [listeyiYenile]);
+
   return (
     <div className="yonetimFormu">
       {hata && <div className="hataKutusu">{hata}</div>}
+      {basariMesaji && <div className="basariliKutu">{basariMesaji}</div>}
       {!malzemeler && <div className="yukleniyor">Yükleniyor…</div>}
       {malzemeler && malzemeler.length === 0 && (
         <div className="bosDurum">Bu depoda henüz malzeme kaydı yok — Malzeme Giriş sekmesinden ekleyin.</div>
@@ -204,18 +211,119 @@ function MalzemeListesi({ santralId }) {
                 {m.barkod && ` · Barkod: ${m.barkod}`}
               </div>
               <div className="kullaniciAlt">
+                {yonetici && (
+                  <button
+                    className="linkButon"
+                    onClick={() => {
+                      setAcikGirisId(acikGirisId === m.malzeme_id ? null : m.malzeme_id);
+                      setAcikKarekodId(null);
+                    }}
+                  >
+                    {acikGirisId === m.malzeme_id ? "Girişi Gizle" : "+ Malzeme Girişi"}
+                  </button>
+                )}
                 <button
                   className="linkButon"
-                  onClick={() => setAcikKarekodId(acikKarekodId === m.malzeme_id ? null : m.malzeme_id)}
+                  onClick={() => {
+                    setAcikKarekodId(acikKarekodId === m.malzeme_id ? null : m.malzeme_id);
+                    setAcikGirisId(null);
+                  }}
                 >
                   {acikKarekodId === m.malzeme_id ? "Karekodu Gizle" : "Karekod Oluştur"}
                 </button>
               </div>
+              {acikGirisId === m.malzeme_id && (
+                <HizliMalzemeGirisi
+                  santralId={santralId}
+                  malzeme={m}
+                  onTamamlandi={(fisNo) => {
+                    setAcikGirisId(null);
+                    setBasariMesaji(`"${m.ad}" için giriş kaydedildi — Fiş No: ${fisNo}`);
+                    listeyiYenile();
+                  }}
+                  onVazgec={() => setAcikGirisId(null)}
+                />
+              )}
               {acikKarekodId === m.malzeme_id && <MalzemeKarekod malzeme={m} />}
             </div>
           );
         })}
     </div>
+  );
+}
+
+/** Depo Malzeme Listesi'ndeki bir satırdan, o malzeme için hızlıca yeni bir
+ * giriş (stok artışı) yapmayı sağlar — Malzeme Giriş sekmesine gidip SKU'yu
+ * yeniden aratmaya gerek kalmadan. Diğer alanlar (ad, birim, barkod, kritik
+ * sınır, konum) malzemenin mevcut bilgilerinden otomatik gönderilir; backend
+ * bunları COALESCE ile korur/günceller (bkz. depo.js POST .../depo/giris).
+ * Yalnızca yönetici rollere (Santral Sorumlusu ve üstü) gösterilir — bu,
+ * backend'in requireRole(GIRIS_ROLLERI) ile zaten uyguladığı kısıtın
+ * arayüzdeki yansımasıdır. */
+function HizliMalzemeGirisi({ santralId, malzeme, onTamamlandi, onVazgec }) {
+  const [miktar, setMiktar] = useState("");
+  const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [hata, setHata] = useState(null);
+
+  async function gonder(e) {
+    e.preventDefault();
+    setHata(null);
+    if (!miktar || Number(miktar) <= 0) {
+      setHata("Sıfırdan büyük bir miktar girmelisiniz.");
+      return;
+    }
+    setGonderiliyor(true);
+    try {
+      const sonuc = await istekAt(`/api/v1/santraller/${santralId}/depo/giris`, {
+        method: "POST",
+        body: JSON.stringify({
+          sku: malzeme.sku,
+          ad: malzeme.ad,
+          barkod: malzeme.barkod || null,
+          birim: malzeme.birim,
+          miktar: Number(miktar),
+          kritik_stok_miktari: malzeme.kritik_stok_miktari ?? null,
+          konum: malzeme.konum || null,
+        }),
+      });
+      onTamamlandi(sonuc.giris.fis_no);
+    } catch (err) {
+      setHata(err.message);
+    } finally {
+      setGonderiliyor(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={gonder}
+      style={{ marginTop: "10px", padding: "12px", background: "var(--paper)", borderRadius: "10px" }}
+    >
+      {hata && <div className="hataKutusu">{hata}</div>}
+      <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+        <div className="alan" style={{ flex: 1, marginBottom: 0 }}>
+          <label>
+            Eklenecek Miktar ({malzeme.birim}) — Mevcut: {malzeme.mevcut_miktar} {malzeme.birim}
+          </label>
+          <input
+            autoFocus
+            required
+            type="number"
+            step="any"
+            min="0.001"
+            value={miktar}
+            onChange={(e) => setMiktar(e.target.value)}
+            placeholder="Ör. 10"
+          />
+        </div>
+        <button className="birincilButon" style={{ width: "auto" }} type="submit" disabled={gonderiliyor}>
+          {gonderiliyor ? "Kaydediliyor…" : "Girişi Kaydet"}
+        </button>
+        <button type="button" className="kucukButon" style={{ background: "var(--ink-soft)", width: "auto" }} onClick={onVazgec}>
+          Vazgeç
+        </button>
+      </div>
+    </form>
   );
 }
 
