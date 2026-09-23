@@ -15,6 +15,11 @@ export default function DepoSayfasi() {
     { deger: "LISTE", etiket: "Depo Malzeme Listesi" },
     { deger: "GIRIS", etiket: "Malzeme Giriş" },
     { deger: "CIKIS", etiket: "Malzeme Çıkış" },
+    // Çıkış talebi oluşturabilen HERKES (Saha Personeli'nden Admin'e kadar)
+    // kendi onaylanmış taleplerini görebilmeli — bu yüzden yonetici/!yonetici
+    // ayrımına değil, sahaVeUstu'ya bağlı (aşağıdaki BEKLEYEN_ONAYLAR'la aynı
+    // mantık, yalnızca ONAYLANDI durumundakiler için).
+    ...(sahaVeUstu ? [{ deger: "ONAYLANAN_CIKISLAR", etiket: "Onaylanan Malzeme Çıkışı" }] : []),
     ...(yonetici
       ? [
           { deger: "CIKIS_ONAY", etiket: "Bekleyen Malzeme Çıkış Onayları" },
@@ -150,6 +155,9 @@ export default function DepoSayfasi() {
                 <CikisOnay santralId={seciliSantralId} setHata={setHata} setBilgi={setBilgi} />
               )}
               {sekme === "CIKIS_RED" && yonetici && <CikisRed santralId={seciliSantralId} setHata={setHata} />}
+              {sekme === "ONAYLANAN_CIKISLAR" && sahaVeUstu && (
+                <OnaylananCikislar santralId={seciliSantralId} kullaniciId={kullanici?.kullanici_id} setHata={setHata} />
+              )}
               {sekme === "BEKLEYEN_ONAYLAR" && !yonetici && (
                 <BekleyenOnaylar santralId={seciliSantralId} kullaniciId={kullanici?.kullanici_id} setHata={setHata} />
               )}
@@ -773,6 +781,44 @@ function BekleyenOnaylar({ santralId, kullaniciId, setHata }) {
             </div>
             <div className="gorevAlt">
               {new Date(t.talep_tarihi).toLocaleString("tr-TR")} · Onay bekliyor
+              {t.kullanim_yeri && ` · Kullanım yeri: ${t.kullanim_yeri}`}
+            </div>
+          </div>
+        ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// ONAYLANAN MALZEME ÇIKIŞI — çıkış talebi oluşturabilen HERKES (Saha
+// Personeli'nden Admin'e kadar) için: kendi gönderdikleri, ONAYLANMIŞ
+// taleplerini (fiş no, onaylayan kişi ve çıkış tarihi dahil) gösterir.
+// BekleyenOnaylar ile AYNI desen — yalnızca durum=ONAYLANDI.
+function OnaylananCikislar({ santralId, kullaniciId, setHata }) {
+  const [talepler, setTalepler] = useState(null);
+
+  useEffect(() => {
+    setTalepler(null);
+    istekAt(`/api/v1/santraller/${santralId}/depo/cikis?durum=ONAYLANDI`)
+      .then((v) => setTalepler(v.veri.filter((t) => t.talep_eden_kullanici_id === kullaniciId)))
+      .catch((err) => setHata(err.message));
+  }, [santralId, kullaniciId, setHata]);
+
+  return (
+    <div className="yonetimFormu">
+      <h3 style={{ marginTop: 0 }}>Onaylanan Malzeme Çıkışı</h3>
+      {!talepler && <div className="yukleniyor">Yükleniyor…</div>}
+      {talepler && talepler.length === 0 && <div className="bosDurum">Onaylanmış çıkış talebiniz yok.</div>}
+      {talepler &&
+        talepler.map((t) => (
+          <div className="satirKart" key={t.cikis_id}>
+            <div>
+              <strong>{t.malzeme_adi}</strong> — {t.miktar} {t.birim}
+              {t.fis_no && <span className="gorevAlt"> — Fiş No: {t.fis_no}</span>}
+            </div>
+            <div className="gorevAlt">
+              {t.cikis_tarihi ? new Date(t.cikis_tarihi).toLocaleString("tr-TR") : "—"} · Onaylayan:{" "}
+              {t.onaylayan_adi || "—"}
               {t.kullanim_yeri && ` · Kullanım yeri: ${t.kullanim_yeri}`}
             </div>
           </div>
