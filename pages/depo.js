@@ -156,7 +156,7 @@ export default function DepoSayfasi() {
               )}
               {sekme === "CIKIS_RED" && yonetici && <CikisRed santralId={seciliSantralId} setHata={setHata} />}
               {sekme === "ONAYLANAN_CIKISLAR" && sahaVeUstu && (
-                <OnaylananCikislar santralId={seciliSantralId} kullaniciId={kullanici?.kullanici_id} setHata={setHata} />
+                <OnaylananCikislar santralId={seciliSantralId} setHata={setHata} />
               )}
               {sekme === "BEKLEYEN_ONAYLAR" && !yonetici && (
                 <BekleyenOnaylar santralId={seciliSantralId} kullaniciId={kullanici?.kullanici_id} setHata={setHata} />
@@ -790,35 +790,75 @@ function BekleyenOnaylar({ santralId, kullaniciId, setHata }) {
 }
 
 // ---------------------------------------------------------------------
-// ONAYLANAN MALZEME ÇIKIŞI — çıkış talebi oluşturabilen HERKES (Saha
-// Personeli'nden Admin'e kadar) için: kendi gönderdikleri, ONAYLANMIŞ
-// taleplerini (fiş no, onaylayan kişi ve çıkış tarihi dahil) gösterir.
-// BekleyenOnaylar ile AYNI desen — yalnızca durum=ONAYLANDI.
-function OnaylananCikislar({ santralId, kullaniciId, setHata }) {
+// ONAYLANAN MALZEME ÇIKIŞI — çıkış talebi oluşturabilen herkese açık
+// (Saha Personeli'nden Admin'e kadar): bu santraldeki TÜM onaylanmış
+// çıkış taleplerini listeler (CikisRed'in reddedilenler listesiyle AYNI
+// kapsam). "Onaylayan" kutusundan belirli bir onaylayana göre filtrelenebilir
+// — seçim yapılmazsa ("Tümü") tam liste gösterilir. Onaylayan seçenekleri
+// ayrı bir istek atmadan, zaten çekilmiş olan listedeki benzersiz
+// onaylayanlardan türetilir. Alt bilgi satırı CikisRed'le AYNI biçimde:
+// "Talep eden: X · Onaylayan: Y · tarih".
+function OnaylananCikislar({ santralId, setHata }) {
   const [talepler, setTalepler] = useState(null);
+  const [seciliOnaylayanId, setSeciliOnaylayanId] = useState("");
 
   useEffect(() => {
     setTalepler(null);
+    setSeciliOnaylayanId("");
     istekAt(`/api/v1/santraller/${santralId}/depo/cikis?durum=ONAYLANDI`)
-      .then((v) => setTalepler(v.veri.filter((t) => t.talep_eden_kullanici_id === kullaniciId)))
+      .then((v) => setTalepler(v.veri))
       .catch((err) => setHata(err.message));
-  }, [santralId, kullaniciId, setHata]);
+  }, [santralId, setHata]);
+
+  const onaylayanlar = [];
+  if (talepler) {
+    const gorulenIdler = new Set();
+    for (const t of talepler) {
+      if (t.onaylayan_kullanici_id && !gorulenIdler.has(t.onaylayan_kullanici_id)) {
+        gorulenIdler.add(t.onaylayan_kullanici_id);
+        onaylayanlar.push({ id: t.onaylayan_kullanici_id, ad: t.onaylayan_adi || "—" });
+      }
+    }
+    onaylayanlar.sort((a, b) => a.ad.localeCompare(b.ad));
+  }
+
+  const gosterilecekler = seciliOnaylayanId
+    ? (talepler || []).filter((t) => t.onaylayan_kullanici_id === seciliOnaylayanId)
+    : talepler;
 
   return (
     <div className="yonetimFormu">
       <h3 style={{ marginTop: 0 }}>Onaylanan Malzeme Çıkışı</h3>
+
+      {talepler && talepler.length > 0 && (
+        <div className="alan" style={{ maxWidth: "300px" }}>
+          <label>Onaylayana göre filtrele</label>
+          <select value={seciliOnaylayanId} onChange={(e) => setSeciliOnaylayanId(e.target.value)}>
+            <option value="">Tümü</option>
+            {onaylayanlar.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.ad}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {!talepler && <div className="yukleniyor">Yükleniyor…</div>}
-      {talepler && talepler.length === 0 && <div className="bosDurum">Onaylanmış çıkış talebiniz yok.</div>}
-      {talepler &&
-        talepler.map((t) => (
+      {talepler && talepler.length === 0 && <div className="bosDurum">Onaylanmış çıkış talebi yok.</div>}
+      {talepler && talepler.length > 0 && gosterilecekler.length === 0 && (
+        <div className="bosDurum">Bu onaylayana ait onaylanmış çıkış talebi yok.</div>
+      )}
+      {gosterilecekler &&
+        gosterilecekler.map((t) => (
           <div className="satirKart" key={t.cikis_id}>
             <div>
               <strong>{t.malzeme_adi}</strong> — {t.miktar} {t.birim}
               {t.fis_no && <span className="gorevAlt"> — Fiş No: {t.fis_no}</span>}
             </div>
             <div className="gorevAlt">
-              {t.cikis_tarihi ? new Date(t.cikis_tarihi).toLocaleString("tr-TR") : "—"} · Onaylayan:{" "}
-              {t.onaylayan_adi || "—"}
+              Talep eden: {t.talep_eden_adi} · Onaylayan: {t.onaylayan_adi || "—"} ·{" "}
+              {t.cikis_tarihi ? new Date(t.cikis_tarihi).toLocaleString("tr-TR") : "—"}
               {t.kullanim_yeri && ` · Kullanım yeri: ${t.kullanim_yeri}`}
             </div>
           </div>
