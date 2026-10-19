@@ -4,6 +4,13 @@ import Link from "next/link";
 import { cikisYap, kullaniciAl, yoneticiMi, isletmeYoneticisiMi, platformAdminMi, istekAt, tokenAl, arkaPlaniUygula } from "../lib/api";
 import OzetBanner from "./OzetBanner";
 
+// Bu süre boyunca HİÇBİR fare/klavye/dokunma etkileşimi olmazsa, kullanıcı
+// otomatik olarak çıkış yaptırılıp giriş sayfasına yönlendirilir.
+const BOSTA_KALMA_SURESI_MS = 15 * 60 * 1000; // 15 dakika
+// mousemove gibi çok sık tetiklenen olaylarda zamanlayıcıyı gereksiz yere
+// defalarca sıfırlamamak için en az bu kadar süre geçmesini bekler.
+const SIFIRLAMA_ARALIGI_MS = 1000;
+
 export default function UstBar() {
   const router = useRouter();
   const kullanici = typeof window !== "undefined" ? kullaniciAl() : null;
@@ -24,6 +31,41 @@ export default function UstBar() {
       .catch(() => {});
     const kayitliDurum = localStorage.getItem("ozetBannerGorunur");
     if (kayitliDurum !== null) setOzetGorunur(kayitliDurum === "1");
+  }, []);
+
+  // BOŞTA KALMA (idle) TAKİBİ — 15 dakika boyunca hiç etkileşim olmazsa
+  // oturumu sonlandırıp ana sayfaya yönlendirir. Token yoksa (giriş
+  // yapılmamışsa) hiç kurulmaz. Bileşen kaldırılınca (sayfa değişince)
+  // dinleyiciler ve zamanlayıcı temizlenir — aksi halde her sayfa
+  // geçişinde bir yenisi birikir.
+  useEffect(() => {
+    if (!tokenAl()) return;
+
+    let zamanlayici;
+    let sonSifirlama = 0;
+
+    async function bostaKaldigiIcinCikisYap() {
+      await cikisYap();
+      router.push("/");
+    }
+
+    function zamanlayiciyiSifirla() {
+      const simdi = Date.now();
+      if (simdi - sonSifirlama < SIFIRLAMA_ARALIGI_MS) return;
+      sonSifirlama = simdi;
+      clearTimeout(zamanlayici);
+      zamanlayici = setTimeout(bostaKaldigiIcinCikisYap, BOSTA_KALMA_SURESI_MS);
+    }
+
+    const izlenecekOlaylar = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    izlenecekOlaylar.forEach((olay) => window.addEventListener(olay, zamanlayiciyiSifirla));
+    zamanlayiciyiSifirla(); // ilk kurulum
+
+    return () => {
+      clearTimeout(zamanlayici);
+      izlenecekOlaylar.forEach((olay) => window.removeEventListener(olay, zamanlayiciyiSifirla));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function ozetGoruntulemeyiDegistir() {
