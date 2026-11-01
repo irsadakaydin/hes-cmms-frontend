@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
@@ -21,6 +21,10 @@ export default function EkipmanOlusturSayfasi() {
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [taslak, setTaslak] = useState(bosForm());
   const [klasorYolu, setKlasorYolu] = useState("");
+  // Bu oturumda (sayfa açıkken) eklenen ekipmanların kısa listesi ve ad kutusuna
+  // odak dönmesi için referans — art arda ekipman eklemeyi kolaylaştırır.
+  const [eklenenler, setEklenenler] = useState([]);
+  const adKutusuRef = useRef(null);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -52,9 +56,15 @@ export default function EkipmanOlusturSayfasi() {
         method: "POST",
         body: JSON.stringify(gonderilecek),
       });
-      setBilgi(`"${yeni.ad}" ekipmanı oluşturuldu.`);
-      setTaslak({ ...bosForm(), santral_id });
-      setKlasorYolu("");
+      setBilgi(`"${yeni.ad}" ekipmanı oluşturuldu — aynı konuma yeni bir ekipman ekleyebilirsiniz.`);
+      setEklenenler((liste) => [
+        ...liste,
+        { anahtar: yeni.ekipman_id || `${Date.now()}-${liste.length}`, ad: yeni.ad, tip: gonderilecek.tip, konum: klasorYolu },
+      ]);
+      // Klasör konumu, Ünite No ve Üretici korunur (art arda ekleme için);
+      // ad, tip, seri no, kurulum tarihi ve konum notu her ekipmana özgü olduğu için temizlenir.
+      setTaslak((t) => ({ ...bosForm(), santral_id, klasor_id: t.klasor_id, unite_no: t.unite_no, uretici: t.uretici }));
+      if (adKutusuRef.current) adKutusuRef.current.focus();
     } catch (err) {
       setHata(err.message);
     } finally {
@@ -93,6 +103,8 @@ export default function EkipmanOlusturSayfasi() {
                     onChange={(e) => {
                       setSeciliHoldingId(e.target.value);
                       setTaslak({ ...taslak, santral_id: "" });
+                      setKlasorYolu("");
+                      setEklenenler([]);
                     }}
                   >
                     <option value="">Seçin…</option>
@@ -113,7 +125,11 @@ export default function EkipmanOlusturSayfasi() {
                     <select
                       required
                       value={taslak.santral_id}
-                      onChange={(e) => setTaslak({ ...taslak, santral_id: e.target.value, klasor_id: "" })}
+                      onChange={(e) => {
+                        setTaslak({ ...taslak, santral_id: e.target.value, klasor_id: "" });
+                        setKlasorYolu("");
+                        setEklenenler([]);
+                      }}
                     >
                       <option value="">Seçin…</option>
                       {gosterilecekSantraller &&
@@ -161,6 +177,7 @@ export default function EkipmanOlusturSayfasi() {
                     <label>Ekipman adı</label>
                     <input
                       required
+                      ref={adKutusuRef}
                       value={taslak.ad}
                       onChange={(e) => setTaslak({ ...taslak, ad: e.target.value })}
                       placeholder="Ör. Türbin 2"
@@ -199,9 +216,31 @@ export default function EkipmanOlusturSayfasi() {
                       placeholder="Ör. Santral Binası Kat -1"
                     />
                   </div>
+                  {!taslak.klasor_id && (
+                    <div className="kutuphaneBosUyari" style={{ marginBottom: "10px" }}>
+                      ⚠ Klasör konumu seçilmedi — bu ekipman bir klasöre bağlı olmayacak ve ona bakım şablonu bağlanamayacak.
+                    </div>
+                  )}
                   <button className="birincilButon" type="submit" disabled={gonderiliyor}>
                     {gonderiliyor ? "Oluşturuluyor…" : "Ekipmanı Oluştur"}
                   </button>
+                  <div className="gorevAlt" style={{ marginTop: "6px" }}>
+                    Oluşturduktan sonra konum korunur; hemen yeni bir ekipman ekleyebilirsiniz.
+                  </div>
+                  {eklenenler.length > 0 && (
+                    <div className="alan" style={{ marginTop: "14px" }}>
+                      <label>Bu oturumda eklenenler ({eklenenler.length})</label>
+                      {eklenenler.map((eklenen) => (
+                        <div className="satirKart" key={eklenen.anahtar}>
+                          <strong>{eklenen.ad}</strong>
+                          <div className="gorevAlt">
+                            {eklenen.tip}
+                            {eklenen.konum ? ` · ${eklenen.konum}` : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </form>
