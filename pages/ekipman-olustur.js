@@ -4,6 +4,7 @@ import Head from "next/head";
 import { istekAt, tokenAl, yoneticiMi, platformAdminMi } from "../lib/api";
 import UstBar from "../components/UstBar";
 import EkipmanKlasorAgaci from "../components/EkipmanKlasorAgaci";
+import EkipmanAgaciListesi from "../components/EkipmanAgaciListesi";
 
 function bosForm() {
   return { santral_id: "", ad: "", tip: "", unite_no: "", seri_no: "", uretici: "", kurulum_tarihi: "", konum_notu: "", klasor_id: "" };
@@ -25,6 +26,10 @@ export default function EkipmanOlusturSayfasi() {
   // odak dönmesi için referans — art arda ekipman eklemeyi kolaylaştırır.
   const [eklenenler, setEklenenler] = useState([]);
   const adKutusuRef = useRef(null);
+  // Bu santralde zaten kayıtlı ekipman tipleri — "Tip" kutusunda öneri olarak çıkar;
+  // şablonlar ve karekod eşleşmeleri tipi BİREBİR karşılaştırdığı için yazım
+  // farklarını azaltır. Yüklenemezse sessizce boş kalır (serbest yazım yine çalışır).
+  const [tipOnerileri, setTipOnerileri] = useState([]);
 
   useEffect(() => {
     if (!tokenAl()) {
@@ -44,6 +49,26 @@ export default function EkipmanOlusturSayfasi() {
       })
       .catch((err) => setHata(err.message));
   }, [router]);
+
+  useEffect(() => {
+    if (!taslak.santral_id) {
+      setTipOnerileri([]);
+      return;
+    }
+    let iptal = false;
+    istekAt(`/api/v1/santraller/${taslak.santral_id}/ekipmanlar`)
+      .then((sonuc) => {
+        if (iptal) return;
+        const benzersiz = [...new Set((sonuc.veri || []).map((ek) => ek.tip).filter(Boolean))];
+        setTipOnerileri(benzersiz.sort((a, b) => a.localeCompare(b, "tr-TR")));
+      })
+      .catch(() => {
+        if (!iptal) setTipOnerileri([]);
+      });
+    return () => {
+      iptal = true;
+    };
+  }, [taslak.santral_id, eklenenler.length]);
 
   async function ekipmanEkle(e) {
     e.preventDefault();
@@ -187,10 +212,21 @@ export default function EkipmanOlusturSayfasi() {
                     <label>Tip</label>
                     <input
                       required
+                      list="ekipman-tipi-onerileri"
                       value={taslak.tip}
                       onChange={(e) => setTaslak({ ...taslak, tip: e.target.value })}
                       placeholder="Ör. Francis Türbin"
                     />
+                    <datalist id="ekipman-tipi-onerileri">
+                      {tipOnerileri.map((tip) => (
+                        <option key={tip} value={tip} />
+                      ))}
+                    </datalist>
+                    {tipOnerileri.length > 0 && (
+                      <div className="gorevAlt" style={{ marginTop: "4px" }}>
+                        Şablon ve karekod eşleşmeleri için mümkünse listedeki mevcut tiplerden seçin.
+                      </div>
+                    )}
                   </div>
                   <div className="alan">
                     <label>Seri no (isteğe bağlı)</label>
@@ -244,6 +280,17 @@ export default function EkipmanOlusturSayfasi() {
                 </>
               )}
             </form>
+          )}
+
+          {santraller && taslak.santral_id && (
+            <div className="yonetimFormu" style={{ marginTop: "16px" }}>
+              <EkipmanAgaciListesi
+                santralId={taslak.santral_id}
+                klasorId={taslak.klasor_id || ""}
+                kokEtiketi={klasorYolu ? klasorYolu.split(" > ").pop() : ""}
+                yenilemeAnahtari={eklenenler.length}
+              />
+            </div>
           )}
         </div>
       </div>
